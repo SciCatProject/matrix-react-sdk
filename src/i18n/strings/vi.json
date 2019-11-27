@@ -111,9 +111,7 @@
     "Email, name or Matrix ID": "Email, tên hoặc Matrix ID",
     "Start Chat": "Bắt đầu chat",
     "Invite new room members": "Mời thành viên mới",
-    "Who would you like to add to this room?": "Bạn muốn thêm ai vào phòng chat này?",
     "Send Invites": "Gửi lời mời",
-    "Failed to invite user": "Mời người dùng thất bại",
     "Operation failed": "Tác vụ thất bại",
     "Failed to invite": "Không thể mời",
     "Failed to invite users to the room:": "Mời thành viên vào phòng chat thất bại:",
@@ -146,7 +144,6 @@
     "Changes your display nickname": "Đổi tên hiển thị của bạn",
     "Changes your display nickname in the current room only": "Chỉ đổi tên hiển thị của bạn trong phòng này mà thôi",
     "Changes your avatar in this current room only": "Chỉ đổi hình đại diện trong phòng này",
-    "Changes colour scheme of current room": "Đổi tông màu của phòng hiện tại",
     "Gets or sets the room topic": "Lấy hoặc đặt chủ đề phòng",
     "This room has no topic.": "Phòng này chưa có chủ đề.",
     "Sets the room name": "Đặt tên phòng",
@@ -342,6 +339,5 @@
     "Enable URL previews by default for participants in this room": "Bật mặc định xem trước nội dung đường link cho mọi người trong phòng",
     "Room Colour": "Màu phòng chat",
     "Enable widget screenshots on supported widgets": "Bật widget chụp màn hình cho các widget có hỗ trợ",
-    "Sign In": "Đăng nhập",
-    "You can also set a custom identity server, but you won't be able to invite users by email address, or be invited by email address yourself.": "Bạn có thể sử dụng máy chủ định danh riêng, nhưng bạn sẽ không thể mời người dùng bằng email, hoặc được mời bằng email của bạn."
+    "Sign In": "Đăng nhập"
 }
