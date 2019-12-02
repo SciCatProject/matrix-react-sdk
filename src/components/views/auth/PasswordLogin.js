@@ -213,6 +213,7 @@ export default class PasswordLogin extends React.Component {
                     key="username_input"
                     type="text"
                     label={_t("Username")}
+                    placeholder="firstnamelastname"
                     value={this.state.username}
                     onChange={this.onUsernameChanged}
                     onBlur={this.onUsernameBlur}
@@ -285,7 +286,7 @@ export default class PasswordLogin extends React.Component {
         if (!SdkConfig.get().disable_3pid_login) {
             loginType = (
                 <div className="mx_Login_type_container">
-                    <label className="mx_Login_type_label">{ _t('Sign in with') }</label>
+                    {/* <label className="mx_Login_type_label">{ _t('Sign in with') }</label>
                     <Field
                         id="mx_PasswordLogin_type"
                         element="select"
@@ -310,7 +311,7 @@ export default class PasswordLogin extends React.Component {
                         >
                             {_t('Phone')}
                         </option>
-                    </Field>
+                    </Field> */}
                 </div>
             );
         }
