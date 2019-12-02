@@ -260,20 +260,20 @@ export default class PasswordLogin extends React.Component {
         const Field = sdk.getComponent('elements.Field');
         const SignInToText = sdk.getComponent('views.auth.SignInToText');
 
-        let forgotPasswordJsx;
+        // let forgotPasswordJsx;
 
-        if (this.props.onForgotPasswordClick) {
-            forgotPasswordJsx = <span>
-                {_t('Not sure of your password? <a>Set a new one</a>', {}, {
-                    a: sub => <a className="mx_Login_forgot"
-                        onClick={this.onForgotPasswordClick}
-                        href="#"
-                    >
-                        {sub}
-                    </a>,
-                })}
-            </span>;
-        }
+        // if (this.props.onForgotPasswordClick) {
+        //     forgotPasswordJsx = <span>
+        //         {_t('Not sure of your password? <a>Set a new one</a>', {}, {
+        //             a: sub => <a className="mx_Login_forgot"
+        //                 onClick={this.onForgotPasswordClick}
+        //                 href="#"
+        //             >
+        //                 {sub}
+        //             </a>,
+        //         })}
+        //     </span>;
+        // }
 
         const pwFieldClass = classNames({
             error: this.props.loginIncorrect && !this.isLoginEmpty(), // only error password if error isn't top field
@@ -331,7 +331,7 @@ export default class PasswordLogin extends React.Component {
                         value={this.state.password}
                         onChange={this.onPasswordChanged}
                     />
-                    {forgotPasswordJsx}
+                    {/* {forgotPasswordJsx} */}
                     <input className="mx_Login_submit"
                         type="submit"
                         value={_t('Sign in')}

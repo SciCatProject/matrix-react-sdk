@@ -650,9 +650,9 @@ module.exports = createReactClass({
                     { serverDeadSection }
                     { this.renderServerComponent() }
                     { this.renderLoginComponentForStep() }
-                    <a className="mx_AuthBody_changeFlow" onClick={this.onRegisterClick} href="#">
+                    {/* <a className="mx_AuthBody_changeFlow" onClick={this.onRegisterClick} href="#">
                         { _t('Create account') }
-                    </a>
+                    </a> */}
                 </AuthBody>
             </AuthPage>
         );
