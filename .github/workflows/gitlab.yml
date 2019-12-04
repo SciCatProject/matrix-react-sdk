@@ -14,7 +14,7 @@ jobs:
     - name: trigger Job
       uses: appleboy/gitlab-ci-action@master
       with:
-        url: "https://gitlab.esss.lu.se/api/v4/projects/1956/ref/master/trigger/pipeline?token=TOKEN"
+        url: "https://gitlab.esss.lu.se/api/v4/projects/1956/ref/master/trigger/pipeline"
         token: ${{ secrets.GITLAB_TOKEN }}
         project_id: 1956
         ref: "master"
