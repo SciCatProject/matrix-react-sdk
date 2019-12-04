@@ -107,7 +107,7 @@ export default class LanguageDropdown extends React.Component {
 
         return <Dropdown className={this.props.className}
             onOptionChange={this.props.onOptionChange} onSearchChange={this._onSearchChange}
-            searchEnabled={true} value={value}
+            searchEnabled={true} value={value} disabled={this.props.disabled}
         >
             { options }
         </Dropdown>;
@@ -118,4 +118,5 @@ LanguageDropdown.propTypes = {
     className: PropTypes.string,
     onOptionChange: PropTypes.func.isRequired,
     value: PropTypes.string,
+    disabled: PropTypes.bool,
 };
