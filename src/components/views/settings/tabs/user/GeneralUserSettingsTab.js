@@ -62,6 +62,7 @@ export default class GeneralUserSettingsTab extends React.Component {
             },
             emails: [],
             msisdns: [],
+            languageDropdownDisabled: true,
         };
 
         this.dispatcherRef = dis.register(this._onAction);
@@ -300,7 +301,7 @@ export default class GeneralUserSettingsTab extends React.Component {
             <div className="mx_SettingsTab_section">
                 <span className="mx_SettingsTab_subheading">{_t("Language and region")}</span>
                 <LanguageDropdown className="mx_GeneralUserSettingsTab_languageInput"
-                                  onOptionChange={this._onLanguageChange} value={this.state.language} />
+                                  onOptionChange={this._onLanguageChange} value={this.state.language} disabled={this.state.languageDropdownDisabled} />
             </div>
         );
     }
