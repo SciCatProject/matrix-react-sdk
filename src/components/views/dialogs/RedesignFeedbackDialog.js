@@ -19,13 +19,12 @@ import QuestionDialog from './QuestionDialog';
 import { _t } from '../../../languageHandler';
 
 export default (props) => {
-    const existingIssuesUrl = "https://github.com/vector-im/riot-web/issues" +
-        "?q=is%3Aopen+is%3Aissue+sort%3Areactions-%2B1-desc";
-    const newIssueUrl = "https://github.com/vector-im/riot-web/issues/new";
+    const existingIssuesUrl = "https://jira.esss.lu.se/issues/?jql=project%20%3D%20SWAP%20AND%20status%20in%20(%22In%20Progress%22%2C%20%22To%20Do%22%2C%20Blocked)%20AND%20component%20%3D%20SciChat";
+    const newIssueUrl = "https://jira.esss.lu.se/secure/CreateIssue.jspa";
 
     const description1 =
-        _t("If you run into any bugs or have feedback you'd like to share, " +
-           "please let us know on GitHub.");
+        "If you run into any bugs or have feedback you'd like to share, " +
+           "please let the Scientific Web Applications Team know on Jira.";
     const description2 = _t("To help avoid duplicate issues, " +
         "please <existingIssuesLink>view existing issues</existingIssuesLink> " +
         "first (and add a +1) or <newIssueLink>create a new issue</newIssueLink> " +
