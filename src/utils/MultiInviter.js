@@ -15,13 +15,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React from "react";
-import MatrixClientPeg from '../MatrixClientPeg';
+import {MatrixClientPeg} from '../MatrixClientPeg';
 import {getAddressType} from '../UserAddress';
 import GroupStore from '../stores/GroupStore';
-import Promise from 'bluebird';
 import {_t} from "../languageHandler";
-import sdk from "../index";
+import * as sdk from "../index";
 import Modal from "../Modal";
 import SettingsStore from "../settings/SettingsStore";
 import {defer} from "./promise";
@@ -155,6 +153,8 @@ export default class MultiInviter {
                 if (this._canceled) {
                     return;
                 }
+
+                console.error(err);
 
                 let errorText;
                 let fatal = false;

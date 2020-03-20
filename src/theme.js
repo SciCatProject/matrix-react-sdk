@@ -21,6 +21,7 @@ export const DEFAULT_THEME = "light";
 import Tinter from "./Tinter";
 import dis from "./dispatcher";
 import SettingsStore, {SettingLevel} from "./settings/SettingsStore";
+import ThemeController from "./settings/controllers/ThemeController";
 
 export class ThemeWatcher {
     static _instance = null;
@@ -69,7 +70,7 @@ export class ThemeWatcher {
         }
     };
 
-    // XXX: forceTheme param aded here as local echo appears to be unreliable
+    // XXX: forceTheme param added here as local echo appears to be unreliable
     // https://github.com/vector-im/riot-web/issues/11443
     recheck(forceTheme) {
         const oldTheme = this._currentTheme;
@@ -80,12 +81,24 @@ export class ThemeWatcher {
     }
 
     getEffectiveTheme() {
+        // Dev note: Much of this logic is replicated in the GeneralUserSettingsTab
+
+        // XXX: checking the isLight flag here makes checking it in the ThemeController
+        // itself completely redundant since we just override the result here and we're
+        // now effectively just using the ThemeController as a place to store the static
+        // variable. The system theme setting probably ought to have an equivalent
+        // controller that honours the same flag, although probablt better would be to
+        // have the theme logic in one place rather than split between however many
+        // different places.
+        if (ThemeController.isLogin) return 'light';
+
         // If the user has specifically enabled the system matching option (excluding default),
         // then use that over anything else. We pick the lowest possible level for the setting
         // to ensure the ordering otherwise works.
         const systemThemeExplicit = SettingsStore.getValueAt(
             SettingLevel.DEVICE, "use_system_theme", null, false, true);
         if (systemThemeExplicit) {
+            console.log("returning explicit system theme");
             if (this._preferDark.matches) return 'dark';
             if (this._preferLight.matches) return 'light';
         }
@@ -95,7 +108,10 @@ export class ThemeWatcher {
         // level for the setting to ensure the ordering otherwise works.
         const themeExplicit = SettingsStore.getValueAt(
             SettingLevel.DEVICE, "theme", null, false, true);
-        if (themeExplicit) return themeExplicit;
+        if (themeExplicit) {
+            console.log("returning explicit theme: " + themeExplicit);
+            return themeExplicit;
+        }
 
         // If the user hasn't really made a preference in either direction, assume the defaults of the
         // settings and use those.
@@ -103,6 +119,7 @@ export class ThemeWatcher {
             if (this._preferDark.matches) return 'dark';
             if (this._preferLight.matches) return 'light';
         }
+        console.log("returning theme value");
         return SettingsStore.getValue('theme');
     }
 
@@ -151,27 +168,13 @@ function getCustomTheme(themeName) {
 }
 
 /**
- * Gets the underlying theme name for the given theme. This is usually the theme or
- * CSS resource that the theme relies upon to load.
- * @param {string} theme The theme name to get the base of.
- * @returns {string} The base theme (typically "light" or "dark").
- */
-export function getBaseTheme(theme) {
-    if (!theme) return "light";
-    if (theme.startsWith("custom-")) {
-        const customTheme = getCustomTheme(theme.substr(7));
-        return customTheme.is_dark ? "dark-custom" : "light-custom";
-    }
-
-    return theme; // it's probably a base theme
-}
-
-/**
  * Called whenever someone changes the theme
+ * Async function that returns once the theme has been set
+ * (ie. the CSS has been loaded)
  *
  * @param {string} theme new theme
  */
-export function setTheme(theme) {
+export async function setTheme(theme) {
     if (!theme) {
         const themeWatcher = new ThemeWatcher();
         theme = themeWatcher.getEffectiveTheme();
@@ -213,38 +216,41 @@ export function setTheme(theme) {
 
     styleElements[stylesheetName].disabled = false;
 
-    const switchTheme = function() {
-        // we re-enable our theme here just in case we raced with another
-        // theme set request as per https://github.com/vector-im/riot-web/issues/5601.
-        // We could alternatively lock or similar to stop the race, but
-        // this is probably good enough for now.
-        styleElements[stylesheetName].disabled = false;
-        Object.values(styleElements).forEach((a) => {
-            if (a == styleElements[stylesheetName]) return;
-            a.disabled = true;
-        });
-        Tinter.setTheme(theme);
-    };
+    return new Promise((resolve) => {
+        const switchTheme = function() {
+            // we re-enable our theme here just in case we raced with another
+            // theme set request as per https://github.com/vector-im/riot-web/issues/5601.
+            // We could alternatively lock or similar to stop the race, but
+            // this is probably good enough for now.
+            styleElements[stylesheetName].disabled = false;
+            Object.values(styleElements).forEach((a) => {
+                if (a == styleElements[stylesheetName]) return;
+                a.disabled = true;
+            });
+            Tinter.setTheme(theme);
+            resolve();
+        };
 
-    // turns out that Firefox preloads the CSS for link elements with
-    // the disabled attribute, but Chrome doesn't.
+        // turns out that Firefox preloads the CSS for link elements with
+        // the disabled attribute, but Chrome doesn't.
 
-    let cssLoaded = false;
+        let cssLoaded = false;
 
-    styleElements[stylesheetName].onload = () => {
-        switchTheme();
-    };
+        styleElements[stylesheetName].onload = () => {
+            switchTheme();
+        };
 
-    for (let i = 0; i < document.styleSheets.length; i++) {
-        const ss = document.styleSheets[i];
-        if (ss && ss.href === styleElements[stylesheetName].href) {
-            cssLoaded = true;
-            break;
+        for (let i = 0; i < document.styleSheets.length; i++) {
+            const ss = document.styleSheets[i];
+            if (ss && ss.href === styleElements[stylesheetName].href) {
+                cssLoaded = true;
+                break;
+            }
         }
-    }
 
-    if (cssLoaded) {
-        styleElements[stylesheetName].onload = undefined;
-        switchTheme();
-    }
+        if (cssLoaded) {
+            styleElements[stylesheetName].onload = undefined;
+            switchTheme();
+        }
+    });
 }
