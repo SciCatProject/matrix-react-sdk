@@ -315,7 +315,7 @@ export default class MessageComposer extends React.Component {
             // complex because of conference calls.
 
             const SendMessageComposer = sdk.getComponent("rooms.SendMessageComposer");
-            // const callInProgress = this.props.callState && this.props.callState !== 'ended';
+            const callInProgress = this.props.callState && this.props.callState !== 'ended';
 
             controls.push(
                 <SendMessageComposer
