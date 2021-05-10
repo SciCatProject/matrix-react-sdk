@@ -581,14 +581,6 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
                     {_t("If you've joined lots of rooms, this might take a while")}
                 </div> }
             </div>;
-        } else if (SettingsStore.getValue(UIFeature.Registration)) {
-            footer = (
-                <span className="mx_AuthBody_changeFlow">
-                    {_t("New? <a>Create account</a>", {}, {
-                        a: sub => <a onClick={this.onTryRegisterClick} href="#">{ sub }</a>,
-                    })}
-                </span>
-            );
         }
 
         return (
