@@ -17,17 +17,17 @@ limitations under the License.
 
 import React from 'react';
 import {_t} from "../../../../../languageHandler";
-import {SettingLevel} from "../../../../../settings/SettingsStore";
 import LabelledToggleSwitch from "../../../elements/LabelledToggleSwitch";
 import SettingsStore from "../../../../../settings/SettingsStore";
 import Field from "../../../elements/Field";
 import * as sdk from "../../../../..";
 import PlatformPeg from "../../../../../PlatformPeg";
+import {SettingLevel} from "../../../../../settings/SettingLevel";
+import {replaceableComponent} from "../../../../../utils/replaceableComponent";
 
+@replaceableComponent("views.settings.tabs.user.PreferencesUserSettingsTab")
 export default class PreferencesUserSettingsTab extends React.Component {
     static ROOM_LIST_SETTINGS = [
-        'RoomList.orderAlphabetically',
-        'RoomList.orderByImportance',
         'breadcrumbs',
     ];
 
@@ -35,6 +35,8 @@ export default class PreferencesUserSettingsTab extends React.Component {
         'MessageComposerInput.autoReplaceEmoji',
         'MessageComposerInput.suggestEmoji',
         'sendTypingNotifications',
+        'MessageComposerInput.ctrlEnterToSend',
+        'MessageComposerInput.showStickersButton',
     ];
 
     static TIMELINE_SETTINGS = [
@@ -47,15 +49,19 @@ export default class PreferencesUserSettingsTab extends React.Component {
         'alwaysShowTimestamps',
         'showRedactions',
         'enableSyntaxHighlightLanguageDetection',
+        'expandCodeByDefault',
+        'scrollToBottomOnMessageSent',
+        'showCodeLineNumbers',
         'showJoinLeaves',
         'showAvatarChanges',
         'showDisplaynameChanges',
         'showImages',
+        'showChatEffects',
+        'Pill.shouldShowPillAvatar',
+        'ctrlFForSearch',
     ];
 
-    static ADVANCED_SETTINGS = [
-        'alwaysShowEncryptionIcons',
-        'Pill.shouldShowPillAvatar',
+    static GENERAL_SETTINGS = [
         'TagPanel.enableTagPanel',
         'promptBeforeInviteUnknownUsers',
         // Start automatically after startup (electron-only)
@@ -68,6 +74,8 @@ export default class PreferencesUserSettingsTab extends React.Component {
         this.state = {
             autoLaunch: false,
             autoLaunchSupported: false,
+            warnBeforeExit: true,
+            warnBeforeExitSupported: false,
             alwaysShowMenuBar: true,
             alwaysShowMenuBarSupported: false,
             minimizeToTray: true,
@@ -81,13 +89,19 @@ export default class PreferencesUserSettingsTab extends React.Component {
         };
     }
 
-    async componentWillMount(): void {
+    async componentDidMount(): void {
         const platform = PlatformPeg.get();
 
         const autoLaunchSupported = await platform.supportsAutoLaunch();
         let autoLaunch = false;
         if (autoLaunchSupported) {
             autoLaunch = await platform.getAutoLaunchEnabled();
+        }
+
+        const warnBeforeExitSupported = await platform.supportsWarnBeforeExit();
+        let warnBeforeExit = false;
+        if (warnBeforeExitSupported) {
+            warnBeforeExit = await platform.shouldWarnBeforeExit();
         }
 
         const alwaysShowMenuBarSupported = await platform.supportsAutoHideMenuBar();
@@ -105,6 +119,8 @@ export default class PreferencesUserSettingsTab extends React.Component {
         this.setState({
             autoLaunch,
             autoLaunchSupported,
+            warnBeforeExit,
+            warnBeforeExitSupported,
             alwaysShowMenuBarSupported,
             alwaysShowMenuBar,
             minimizeToTraySupported,
@@ -115,6 +131,10 @@ export default class PreferencesUserSettingsTab extends React.Component {
     _onAutoLaunchChange = (checked) => {
         PlatformPeg.get().setAutoLaunchEnabled(checked).then(() => this.setState({autoLaunch: checked}));
     };
+
+    _onWarnBeforeExitChange = (checked) => {
+        PlatformPeg.get().setWarnBeforeExit(checked).then(() => this.setState({warnBeforeExit: checked}));
+    }
 
     _onAlwaysShowMenuBarChange = (checked) => {
         PlatformPeg.get().setAutoHideMenuBarEnabled(!checked).then(() => this.setState({alwaysShowMenuBar: checked}));
@@ -141,7 +161,9 @@ export default class PreferencesUserSettingsTab extends React.Component {
 
     _renderGroup(settingIds) {
         const SettingsFlag = sdk.getComponent("views.elements.SettingsFlag");
-        return settingIds.map(i => <SettingsFlag key={i} name={i} level={SettingLevel.ACCOUNT} />);
+        return settingIds.filter(SettingsStore.isEnabled).map(i => {
+            return <SettingsFlag key={i} name={i} level={SettingLevel.ACCOUNT} />;
+        });
     }
 
     render() {
@@ -151,6 +173,14 @@ export default class PreferencesUserSettingsTab extends React.Component {
                 value={this.state.autoLaunch}
                 onChange={this._onAutoLaunchChange}
                 label={_t('Start automatically after system login')} />;
+        }
+
+        let warnBeforeExitOption = null;
+        if (this.state.warnBeforeExitSupported) {
+            warnBeforeExitOption = <LabelledToggleSwitch
+                value={this.state.warnBeforeExit}
+                onChange={this._onWarnBeforeExitChange}
+                label={_t('Warn before quitting')} />;
         }
 
         let autoHideMenuOption = null;
@@ -189,25 +219,23 @@ export default class PreferencesUserSettingsTab extends React.Component {
                 </div>
 
                 <div className="mx_SettingsTab_section">
-                    <span className="mx_SettingsTab_subheading">{_t("Advanced")}</span>
-                    {this._renderGroup(PreferencesUserSettingsTab.ADVANCED_SETTINGS)}
+                    <span className="mx_SettingsTab_subheading">{_t("General")}</span>
+                    {this._renderGroup(PreferencesUserSettingsTab.GENERAL_SETTINGS)}
                     {minimizeToTrayOption}
                     {autoHideMenuOption}
                     {autoLaunchOption}
+                    {warnBeforeExitOption}
                     <Field
-                        id={"autocompleteDelay"}
                         label={_t('Autocomplete delay (ms)')}
                         type='number'
                         value={this.state.autocompleteDelay}
                         onChange={this._onAutocompleteDelayChange} />
                     <Field
-                        id={"readMarkerInViewThresholdMs"}
                         label={_t('Read Marker lifetime (ms)')}
                         type='number'
                         value={this.state.readMarkerInViewThresholdMs}
                         onChange={this._onReadMarkerInViewThresholdMs} />
                     <Field
-                        id={"readMarkerOutOfViewThresholdMs"}
                         label={_t('Read Marker off-screen lifetime (ms)')}
                         type='number'
                         value={this.state.readMarkerOutOfViewThresholdMs}

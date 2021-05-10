@@ -18,7 +18,7 @@ import React from 'react';
 import * as sdk from '../../../index';
 import {_t} from '../../../languageHandler';
 import PropTypes from 'prop-types';
-import dis from '../../../dispatcher';
+import dis from '../../../dispatcher/dispatcher';
 import EditorModel from '../../../editor/model';
 import {getCaretOffsetAndText} from '../../../editor/dom';
 import {htmlSerializeIfNeeded, textSerialize, containsEmote, stripEmoteCommand} from '../../../editor/serialize';
@@ -27,10 +27,13 @@ import {parseEvent} from '../../../editor/deserialize';
 import {PartCreator} from '../../../editor/parts';
 import EditorStateTransfer from '../../../utils/EditorStateTransfer';
 import classNames from 'classnames';
-import {EventStatus} from 'matrix-js-sdk';
+import {EventStatus} from 'matrix-js-sdk/src/models/event';
 import BasicMessageComposer from "./BasicMessageComposer";
-import {Key} from "../../../Keyboard";
 import MatrixClientContext from "../../../contexts/MatrixClientContext";
+import {Action} from "../../../dispatcher/actions";
+import CountlyAnalytics from "../../../CountlyAnalytics";
+import {getKeyBindingsManager, MessageComposerAction} from '../../../KeyBindingsManager';
+import {replaceableComponent} from "../../../utils/replaceableComponent";
 
 function _isReply(mxEvent) {
     const relatesTo = mxEvent.getContent()["m.relates_to"];
@@ -99,6 +102,7 @@ function createEditContent(model, editedEvent) {
     }, contentBody);
 }
 
+@replaceableComponent("views.rooms.EditMessageComposer")
 export default class EditMessageComposer extends React.Component {
     static propTypes = {
         // the message event being edited
@@ -107,14 +111,15 @@ export default class EditMessageComposer extends React.Component {
 
     static contextType = MatrixClientContext;
 
-    constructor(props) {
-        super(props);
+    constructor(props, context) {
+        super(props, context);
         this.model = null;
         this._editorRef = null;
 
         this.state = {
             saveDisabled: true,
         };
+        this._createEditorModel();
     }
 
     _setEditorRef = ref => {
@@ -130,41 +135,47 @@ export default class EditMessageComposer extends React.Component {
         if (this._editorRef.isComposing(event)) {
             return;
         }
-        if (event.metaKey || event.altKey || event.shiftKey) {
-            return;
-        }
-        if (event.key === Key.ENTER) {
-            this._sendEdit();
-            event.preventDefault();
-        } else if (event.key === Key.ESCAPE) {
-            this._cancelEdit();
-        } else if (event.key === Key.ARROW_UP) {
-            if (this._editorRef.isModified() || !this._editorRef.isCaretAtStart()) {
-                return;
-            }
-            const previousEvent = findEditableEvent(this._getRoom(), false, this.props.editState.getEvent().getId());
-            if (previousEvent) {
-                dis.dispatch({action: 'edit_event', event: previousEvent});
+        const action = getKeyBindingsManager().getMessageComposerAction(event);
+        switch (action) {
+            case MessageComposerAction.Send:
+                this._sendEdit();
                 event.preventDefault();
+                break;
+            case MessageComposerAction.CancelEditing:
+                this._cancelEdit();
+                break;
+            case MessageComposerAction.EditPrevMessage: {
+                if (this._editorRef.isModified() || !this._editorRef.isCaretAtStart()) {
+                    return;
+                }
+                const previousEvent = findEditableEvent(this._getRoom(), false,
+                    this.props.editState.getEvent().getId());
+                if (previousEvent) {
+                    dis.dispatch({action: 'edit_event', event: previousEvent});
+                    event.preventDefault();
+                }
+                break;
             }
-        } else if (event.key === Key.ARROW_DOWN) {
-            if (this._editorRef.isModified() || !this._editorRef.isCaretAtEnd()) {
-                return;
+            case MessageComposerAction.EditNextMessage: {
+                if (this._editorRef.isModified() || !this._editorRef.isCaretAtEnd()) {
+                    return;
+                }
+                const nextEvent = findEditableEvent(this._getRoom(), true, this.props.editState.getEvent().getId());
+                if (nextEvent) {
+                    dis.dispatch({action: 'edit_event', event: nextEvent});
+                } else {
+                    dis.dispatch({action: 'edit_event', event: null});
+                    dis.fire(Action.FocusComposer);
+                }
+                event.preventDefault();
+                break;
             }
-            const nextEvent = findEditableEvent(this._getRoom(), true, this.props.editState.getEvent().getId());
-            if (nextEvent) {
-                dis.dispatch({action: 'edit_event', event: nextEvent});
-            } else {
-                dis.dispatch({action: 'edit_event', event: null});
-                dis.dispatch({action: 'focus_composer'});
-            }
-            event.preventDefault();
         }
     }
 
     _cancelEdit = () => {
         dis.dispatch({action: "edit_event", event: null});
-        dis.dispatch({action: 'focus_composer'});
+        dis.fire(Action.FocusComposer);
     }
 
     _isContentModified(newContent) {
@@ -180,6 +191,7 @@ export default class EditMessageComposer extends React.Component {
     }
 
     _sendEdit = () => {
+        const startTime = CountlyAnalytics.getTimestamp();
         const editedEvent = this.props.editState.getEvent();
         const editContent = createEditContent(this.model, editedEvent);
         const newContent = editContent["m.new_content"];
@@ -188,12 +200,14 @@ export default class EditMessageComposer extends React.Component {
         if (this._isContentModified(newContent)) {
             const roomId = editedEvent.getRoomId();
             this._cancelPreviousPendingEdit();
-            this.context.sendMessage(roomId, editContent);
+            const prom = this.context.sendMessage(roomId, editContent);
+            dis.dispatch({action: "message_sent"});
+            CountlyAnalytics.instance.trackSendMessage(startTime, prom, roomId, true, false, editContent);
         }
 
         // close the event editing and focus composer
         dis.dispatch({action: "edit_event", event: null});
-        dis.dispatch({action: 'focus_composer'});
+        dis.fire(Action.FocusComposer);
     };
 
     _cancelPreviousPendingEdit() {
@@ -221,10 +235,6 @@ export default class EditMessageComposer extends React.Component {
         // then when mounting the editor again with the same editor state,
         // it will set the cursor at the end.
         this.props.editState.setEditorState(caret, parts);
-    }
-
-    componentWillMount() {
-        this._createEditorModel();
     }
 
     _createEditorModel() {

@@ -17,13 +17,18 @@ limitations under the License.
 import React from 'react';
 
 import { _t } from '../../../languageHandler';
+import SdkConfig from "../../../SdkConfig";
 import * as sdk from '../../../index';
 import Modal from '../../../Modal';
-import SettingsStore, {SettingLevel} from "../../../settings/SettingsStore";
+import SettingsStore from "../../../settings/SettingsStore";
 import AccessibleButton from "../elements/AccessibleButton";
 import {formatBytes, formatCountLong} from "../../../utils/FormattingUtils";
 import EventIndexPeg from "../../../indexing/EventIndexPeg";
+import {SettingLevel} from "../../../settings/SettingLevel";
+import {replaceableComponent} from "../../../utils/replaceableComponent";
+import SeshatResetDialog from '../dialogs/SeshatResetDialog';
 
+@replaceableComponent("views.settings.EventIndexPanel")
 export default class EventIndexPanel extends React.Component {
     constructor() {
         super();
@@ -63,7 +68,7 @@ export default class EventIndexPanel extends React.Component {
         }
     }
 
-    async componentWillMount(): void {
+    async componentDidMount(): void {
         this.updateState();
     }
 
@@ -118,19 +123,39 @@ export default class EventIndexPanel extends React.Component {
         await this.updateState();
     }
 
+    _confirmEventStoreReset = () => {
+        const self = this;
+        const { close } = Modal.createDialog(SeshatResetDialog, {
+            onFinished: async (success) => {
+                if (success) {
+                    await SettingsStore.setValue('enableEventIndexing', null, SettingLevel.DEVICE, false);
+                    await EventIndexPeg.deleteEventIndex();
+                    await self._onEnable();
+                    close();
+                }
+            },
+        });
+    }
+
     render() {
         let eventIndexingSettings = null;
         const InlineSpinner = sdk.getComponent('elements.InlineSpinner');
+        const brand = SdkConfig.get().brand;
 
         if (EventIndexPeg.get() !== null) {
             eventIndexingSettings = (
                 <div>
                     <div className='mx_SettingsTab_subsectionText'>
-                        {_t( "Securely cache encrypted messages locally for them " +
-                             "to appear in search results, using ")
-                        } {formatBytes(this.state.eventIndexSize, 0)}
-                        {_t( " to store messages from ")}
-                        {formatCountLong(this.state.roomCount)} {_t("rooms.")}
+                        {_t("Securely cache encrypted messages locally for them " +
+                            "to appear in search results, using %(size)s to store messages from %(rooms)s rooms.",
+                            {
+                                size: formatBytes(this.state.eventIndexSize, 0),
+                                // This drives the singular / plural string
+                                // selection for "room" / "rooms" only.
+                                count: this.state.roomCount,
+                                rooms: formatCountLong(this.state.roomCount),
+                            },
+                        )}
                     </div>
                     <div>
                         <AccessibleButton kind="primary" onClick={this._onManage}>
@@ -157,19 +182,21 @@ export default class EventIndexPanel extends React.Component {
             );
         } else if (EventIndexPeg.platformHasSupport() && !EventIndexPeg.supportIsInstalled()) {
             const nativeLink = (
-                "https://github.com/vector-im/riot-web/blob/develop/" +
+                "https://github.com/vector-im/element-desktop/blob/develop/" +
                 "docs/native-node-modules.md#" +
                 "adding-seshat-for-search-in-e2e-encrypted-rooms"
             );
 
             eventIndexingSettings = (
-                <div>
+                <div className='mx_SettingsTab_subsectionText'>
                     {
-                        _t( "Riot is missing some components required for securely " +
+                        _t( "%(brand)s is missing some components required for securely " +
                             "caching encrypted messages locally. If you'd like to " +
-                            "experiment with this feature, build a custom Riot Desktop " +
+                            "experiment with this feature, build a custom %(brand)s Desktop " +
                             "with <nativeLink>search components added</nativeLink>.",
-                            {},
+                            {
+                                brand,
+                            },
                             {
                                 'nativeLink': (sub) => <a href={nativeLink} target="_blank"
                                     rel="noreferrer noopener">{sub}</a>,
@@ -178,20 +205,47 @@ export default class EventIndexPanel extends React.Component {
                     }
                 </div>
             );
-        } else {
+        } else if (!EventIndexPeg.platformHasSupport()) {
             eventIndexingSettings = (
-                <div>
+                <div className='mx_SettingsTab_subsectionText'>
                     {
-                        _t( "Riot can't securely cache encrypted messages locally " +
-                            "while running in a web browser. Use <riotLink>Riot Desktop</riotLink> " +
+                        _t( "%(brand)s can't securely cache encrypted messages locally " +
+                            "while running in a web browser. Use <desktopLink>%(brand)s Desktop</desktopLink> " +
                             "for encrypted messages to appear in search results.",
-                            {},
                             {
-                                'riotLink': (sub) => <a href="https://riot.im/download/desktop"
+                                brand,
+                            },
+                            {
+                                'desktopLink': (sub) => <a href="https://element.io/get-started"
                                     target="_blank" rel="noreferrer noopener">{sub}</a>,
                             },
                         )
                     }
+                </div>
+            );
+        } else {
+            eventIndexingSettings = (
+                <div className='mx_SettingsTab_subsectionText'>
+                    <p>
+                        {this.state.enabling
+                            ? <InlineSpinner />
+                            : _t("Message search initilisation failed")
+                        }
+                    </p>
+                    {EventIndexPeg.error && (
+                    <details>
+                        <summary>{_t("Advanced")}</summary>
+                        <code>
+                            {EventIndexPeg.error.message}
+                        </code>
+                        <p>
+                            <AccessibleButton key="delete" kind="danger" onClick={this._confirmEventStoreReset}>
+                                {_t("Reset")}
+                            </AccessibleButton>
+                        </p>
+                    </details>
+                    )}
+
                 </div>
             );
         }

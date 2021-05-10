@@ -16,8 +16,8 @@ limitations under the License.
 */
 
 import {MatrixClientPeg} from './MatrixClientPeg';
-import dis from './dispatcher';
-import { EventStatus } from 'matrix-js-sdk';
+import dis from './dispatcher/dispatcher';
+import { EventStatus } from 'matrix-js-sdk/src/models/event';
 
 export default class Resend {
     static resendUnsentEvents(room) {
@@ -45,7 +45,7 @@ export default class Resend {
             });
         }, function(err) {
             // XXX: temporary logging to try to diagnose
-            // https://github.com/vector-im/riot-web/issues/3148
+            // https://github.com/vector-im/element-web/issues/3148
             console.log('Resend got send failure: ' + err.name + '(' + err + ')');
 
             dis.dispatch({
