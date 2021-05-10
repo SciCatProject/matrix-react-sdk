@@ -16,15 +16,16 @@ limitations under the License.
 
 import React, {createRef} from 'react';
 import PropTypes from 'prop-types';
-import createReactClass from 'create-react-class';
 import * as sdk from '../../../index';
 import SettingsStore from "../../../settings/SettingsStore";
 import {Mjolnir} from "../../../mjolnir/Mjolnir";
+import RedactedBody from "./RedactedBody";
+import UnknownBody from "./UnknownBody";
+import {replaceableComponent} from "../../../utils/replaceableComponent";
 
-export default createReactClass({
-    displayName: 'MessageEvent',
-
-    propTypes: {
+@replaceableComponent("views.messages.MessageEvent")
+export default class MessageEvent extends React.Component {
+    static propTypes = {
         /* the MatrixEvent to show */
         mxEvent: PropTypes.object.isRequired,
 
@@ -45,23 +46,26 @@ export default createReactClass({
 
         /* the maximum image height to use, if the event is an image */
         maxImageHeight: PropTypes.number,
-    },
 
-    UNSAFE_componentWillMount: function() {
+        /* the permalinkCreator */
+        permalinkCreator: PropTypes.object,
+    };
+
+    constructor(props) {
+        super(props);
+
         this._body = createRef();
-    },
+    }
 
-    getEventTileOps: function() {
+    getEventTileOps = () => {
         return this._body.current && this._body.current.getEventTileOps ? this._body.current.getEventTileOps() : null;
-    },
+    };
 
-    onTileUpdate: function() {
+    onTileUpdate = () => {
         this.forceUpdate();
-    },
+    };
 
-    render: function() {
-        const UnknownBody = sdk.getComponent('messages.UnknownBody');
-
+    render() {
         const bodyTypes = {
             'm.text': sdk.getComponent('messages.TextualBody'),
             'm.notice': sdk.getComponent('messages.TextualBody'),
@@ -70,6 +74,10 @@ export default createReactClass({
             'm.file': sdk.getComponent('messages.MFileBody'),
             'm.audio': sdk.getComponent('messages.MAudioBody'),
             'm.video': sdk.getComponent('messages.MVideoBody'),
+
+            // TODO: @@ TravisR: Use labs flag determination.
+            // MSC: https://github.com/matrix-org/matrix-doc/pull/2516
+            'org.matrix.msc2516.voice': sdk.getComponent('messages.MAudioBody'),
         };
         const evTypes = {
             'm.sticker': sdk.getComponent('messages.MStickerBody'),
@@ -78,7 +86,7 @@ export default createReactClass({
         const content = this.props.mxEvent.getContent();
         const type = this.props.mxEvent.getType();
         const msgtype = content.msgtype;
-        let BodyType = UnknownBody;
+        let BodyType = RedactedBody;
         if (!this.props.mxEvent.isRedacted()) {
             // only resolve BodyType if event is not redacted
             if (type && evTypes[type]) {
@@ -88,10 +96,13 @@ export default createReactClass({
             } else if (content.url) {
                 // Fallback to MFileBody if there's a content URL
                 BodyType = bodyTypes['m.file'];
+            } else {
+                // Fallback to UnknownBody otherwise if not redacted
+                BodyType = UnknownBody;
             }
         }
 
-        if (SettingsStore.isFeatureEnabled("feature_mjolnir")) {
+        if (SettingsStore.getValue("feature_mjolnir")) {
             const key = `mx_mjolnir_render_${this.props.mxEvent.getRoomId()}__${this.props.mxEvent.getId()}`;
             const allowRender = localStorage.getItem(key) === "true";
 
@@ -118,6 +129,7 @@ export default createReactClass({
             editState={this.props.editState}
             onHeightChanged={this.props.onHeightChanged}
             onMessageAllowed={this.onTileUpdate}
+            permalinkCreator={this.props.permalinkCreator}
         />;
-    },
-});
+    }
+}
