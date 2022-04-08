@@ -360,6 +360,7 @@ export default class GeneralUserSettingsTab extends React.Component<IProps, ISta
                     className="mx_GeneralUserSettingsTab_languageInput"
                     onOptionChange={this.onLanguageChange}
                     value={this.state.language}
+                />
             </div>
         );
     }
