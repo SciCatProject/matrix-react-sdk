@@ -17,6 +17,7 @@ limitations under the License.
 */
 
 import React from 'react';
+
 import * as sdk from '../../index';
 import { _t } from '../../languageHandler';
 import SdkConfig from '../../SdkConfig';
@@ -24,7 +25,7 @@ import dis from '../../dispatcher/dispatcher';
 import AccessibleButton from '../views/elements/AccessibleButton';
 import MatrixClientContext from "../../contexts/MatrixClientContext";
 import AutoHideScrollbar from "./AutoHideScrollbar";
-import {replaceableComponent} from "../../utils/replaceableComponent";
+import { replaceableComponent } from "../../utils/replaceableComponent";
 
 @replaceableComponent("structures.MyGroups")
 export default class MyGroups extends React.Component {
@@ -40,19 +41,19 @@ export default class MyGroups extends React.Component {
     }
 
     _onCreateGroupClick = () => {
-        dis.dispatch({action: 'view_create_group'});
+        dis.dispatch({ action: 'view_create_group' });
     };
 
     _fetch() {
         this.context.getJoinedGroups().then((result) => {
-            this.setState({groups: result.groups, error: null});
+            this.setState({ groups: result.groups, error: null });
         }, (err) => {
             if (err.errcode === 'M_GUEST_ACCESS_FORBIDDEN') {
                 // Indicate that the guest isn't in any groups (which should be true)
-                this.setState({groups: [], error: null});
+                this.setState({ groups: [], error: null });
                 return;
             }
-            this.setState({groups: null, error: err});
+            this.setState({ groups: null, error: err });
         });
     }
 
@@ -81,8 +82,7 @@ export default class MyGroups extends React.Component {
                         </p>
                         <p>
                             { _t(
-                                "To set up a filter, drag a community avatar over to the filter panel on " +
-                                "the far left hand side of the screen. You can click on an avatar in the " +
+                                "You can click on an avatar in the " +
                                 "filter panel at any time to see only the rooms and people associated " +
                                 "with that community.",
                             ) }
@@ -106,11 +106,10 @@ export default class MyGroups extends React.Component {
         }
 
         return <div className="mx_MyGroups">
-            <SimpleRoomHeader title={_t("Communities")} icon={require("../../../res/img/icons-groups.svg")} />
+            <SimpleRoomHeader title={_t("Communities")} icon={require("../../../res/img/icons-groups.svg").default} />
             <div className='mx_MyGroups_header'>
                 <div className="mx_MyGroups_headerCard">
-                    <AccessibleButton className='mx_MyGroups_headerCard_button' onClick={this._onCreateGroupClick}>
-                    </AccessibleButton>
+                    <AccessibleButton className='mx_MyGroups_headerCard_button' onClick={this._onCreateGroupClick} />
                     <div className="mx_MyGroups_headerCard_content">
                         <div className="mx_MyGroups_headerCard_header">
                             { _t('Create a new community') }
@@ -121,9 +120,9 @@ export default class MyGroups extends React.Component {
                         ) }
                     </div>
                 </div>
-                {/*<div className="mx_MyGroups_joinBox mx_MyGroups_headerCard">
+                { /*<div className="mx_MyGroups_joinBox mx_MyGroups_headerCard">
                     <AccessibleButton className='mx_MyGroups_headerCard_button' onClick={this._onJoinGroupClick}>
-                        <TintableSvg src={require("../../../res/img/icons-create-room.svg")} width="50" height="50" />
+                        <img src={require("../../../res/img/icons-create-room.svg").default} width="50" height="50" />
                     </AccessibleButton>
                     <div className="mx_MyGroups_headerCard_content">
                         <div className="mx_MyGroups_headerCard_header">
@@ -137,7 +136,7 @@ export default class MyGroups extends React.Component {
                             { 'i': (sub) => <i>{ sub }</i> })
                         }
                     </div>
-                </div>*/}
+                </div>*/ }
             </div>
             <div className="mx_MyGroups_content">
                 { contentHeader }

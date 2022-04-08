@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import "../skinned-sdk"; // Must be first for skinning to work
 import EditorModel from "../../src/editor/model";
-import {createPartCreator, createRenderer} from "./mock";
+import { createPartCreator, createRenderer } from "./mock";
 
 const pillChannel = "#riot-dev:matrix.org";
 
@@ -102,5 +103,22 @@ describe('editor/range', function() {
         expect(range.parts[0].text).toBe(" abc ");
         range.trim();
         expect(range.parts[0].text).toBe("abc");
+    });
+    // test for edge case when the selection just consists of whitespace
+    it('range trim just whitespace', () => {
+        const renderer = createRenderer();
+        const pc = createPartCreator();
+        const whitespace = "  \n    \n\n";
+        const model = new EditorModel([
+            pc.plain(whitespace),
+        ], pc, renderer);
+        const range = model.startRange(
+            model.positionForOffset(0, false),
+            model.getPositionAtEnd(),
+        );
+
+        expect(range.text).toBe(whitespace);
+        range.trim();
+        expect(range.text).toBe("");
     });
 });

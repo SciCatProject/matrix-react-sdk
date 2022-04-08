@@ -17,14 +17,14 @@ limitations under the License.
 import React from "react";
 import { chunk } from "lodash";
 import classNames from "classnames";
-import {MatrixClient} from "matrix-js-sdk/src/client";
+import { MatrixClient } from "matrix-js-sdk/src/client";
 
 import PlatformPeg from "../../../PlatformPeg";
 import AccessibleButton from "./AccessibleButton";
-import {_t} from "../../../languageHandler";
-import {IdentityProviderBrand, IIdentityProvider, ISSOFlow} from "../../../Login";
+import { _t } from "../../../languageHandler";
+import { IdentityProviderBrand, IIdentityProvider, ISSOFlow } from "../../../Login";
 import AccessibleTooltipButton from "./AccessibleTooltipButton";
-import {mediaFromMxc} from "../../../customisations/Media";
+import { mediaFromMxc } from "../../../customisations/Media";
 
 interface ISSOButtonProps extends Omit<IProps, "flow"> {
     idp: IIdentityProvider;
@@ -34,21 +34,21 @@ interface ISSOButtonProps extends Omit<IProps, "flow"> {
 const getIcon = (brand: IdentityProviderBrand | string) => {
     switch (brand) {
         case IdentityProviderBrand.Apple:
-            return require(`../../../../res/img/element-icons/brands/apple.svg`);
+            return require(`../../../../res/img/element-icons/brands/apple.svg`).default;
         case IdentityProviderBrand.Facebook:
-            return require(`../../../../res/img/element-icons/brands/facebook.svg`);
+            return require(`../../../../res/img/element-icons/brands/facebook.svg`).default;
         case IdentityProviderBrand.Github:
-            return require(`../../../../res/img/element-icons/brands/github.svg`);
+            return require(`../../../../res/img/element-icons/brands/github.svg`).default;
         case IdentityProviderBrand.Gitlab:
-            return require(`../../../../res/img/element-icons/brands/gitlab.svg`);
+            return require(`../../../../res/img/element-icons/brands/gitlab.svg`).default;
         case IdentityProviderBrand.Google:
-            return require(`../../../../res/img/element-icons/brands/google.svg`);
+            return require(`../../../../res/img/element-icons/brands/google.svg`).default;
         case IdentityProviderBrand.Twitter:
-            return require(`../../../../res/img/element-icons/brands/twitter.svg`);
+            return require(`../../../../res/img/element-icons/brands/twitter.svg`).default;
         default:
             return null;
     }
-}
+};
 
 const SSOButton: React.FC<ISSOButtonProps> = ({
     matrixClient,
@@ -111,8 +111,8 @@ interface IProps {
 
 const MAX_PER_ROW = 6;
 
-const SSOButtons: React.FC<IProps> = ({matrixClient, flow, loginType, fragmentAfterLogin, primary}) => {
-    const providers = flow["org.matrix.msc2858.identity_providers"] || [];
+const SSOButtons: React.FC<IProps> = ({ matrixClient, flow, loginType, fragmentAfterLogin, primary }) => {
+    const providers = flow.identity_providers || [];
     if (providers.length < 2) {
         return <div className="mx_SSOButtons">
             <SSOButton

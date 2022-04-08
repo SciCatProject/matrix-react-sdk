@@ -8,24 +8,30 @@
     "moduleResolution": "node",
     "target": "es2016",
     "noImplicitAny": false,
+    "noUnusedLocals": true,
     "sourceMap": false,
     "outDir": "./lib",
     "declaration": true,
     "jsx": "react",
-    "types": [
-      "node",
-      "react",
-      "flux",
-      "react-transition-group"
-    ],
     "lib": [
-      "es2019",
+      "es2020",
       "dom",
       "dom.iterable"
-    ]
+    ],
   },
   "include": [
     "./src/**/*.ts",
-    "./src/**/*.tsx"
+    "./src/**/*.tsx",
+    "./test/test-utils/**/*.ts",
+    "./test/test-utils/**/*.tsx",
+    "./test/utils/**/*.ts",
+    "./test/utils/**/*.tsx",
+    "./test/stores/**/*.ts",
+    "./test/stores/**/*.tsx",
+    "./test/components/**/*.tsx",
+    "./test/components/**/*.ts",
+  ],
+  "exclude": [
+    "./test/end-to-end-tests/"
   ]
 }

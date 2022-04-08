@@ -45,7 +45,7 @@ limitations under the License.
     mask-image: url('$(res)/img/e2e/normal.svg');
     mask-repeat: no-repeat;
     mask-position: center;
-    mask-size: 90%;
+    mask-size: 80%;
 }
 
 // transparent-looking border surrounding the shield for when overlain over avatars
@@ -59,21 +59,21 @@ limitations under the License.
     }
     // shrink the infill of the badge
     &::before {
-        mask-size: 65%;
+        mask-size: 60%;
     }
 }
 
 .mx_E2EIcon_warning::after {
     mask-image: url('$(res)/img/e2e/warning.svg');
-    background-color: $notice-primary-color;
+    background-color: $alert;
 }
 
 .mx_E2EIcon_normal::after {
     mask-image: url('$(res)/img/e2e/normal.svg');
-    background-color: $composer-e2e-icon-color;
+    background-color: $header-panel-text-primary-color;
 }
 
 .mx_E2EIcon_verified::after {
     mask-image: url('$(res)/img/e2e/verified.svg');
-    background-color: $accent-color;
+    background-color: $accent;
 }

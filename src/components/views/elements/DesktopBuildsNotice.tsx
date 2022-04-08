@@ -14,10 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import React from "react";
+import { logger } from "matrix-js-sdk/src/logger";
+
 import EventIndexPeg from "../../../indexing/EventIndexPeg";
 import { _t } from "../../../languageHandler";
 import SdkConfig from "../../../SdkConfig";
-import React from "react";
+import dis from "../../../dispatcher/dispatcher";
+import { Action } from "../../../dispatcher/actions";
+import { UserTab } from "../dialogs/UserSettingsDialog";
+import AccessibleButton from "./AccessibleButton";
 
 export enum WarningKind {
     Files,
@@ -29,49 +35,71 @@ interface IProps {
     kind: WarningKind;
 }
 
-export default function DesktopBuildsNotice({isRoomEncrypted, kind}: IProps) {
+export default function DesktopBuildsNotice({ isRoomEncrypted, kind }: IProps) {
     if (!isRoomEncrypted) return null;
     if (EventIndexPeg.get()) return null;
 
-    const {desktopBuilds, brand} = SdkConfig.get();
+    if (EventIndexPeg.error) {
+        return <>
+            { _t("Message search initialisation failed, check <a>your settings</a> for more information", {}, {
+                a: sub => (
+                    <AccessibleButton
+                        kind="link_inline"
+                        onClick={(evt) => {
+                            evt.preventDefault();
+                            dis.dispatch({
+                                action: Action.ViewUserSettings,
+                                initialTabId: UserTab.Security,
+                            });
+                        }}
+                    >
+                        { sub }
+                    </AccessibleButton>),
+            }) }
+        </>;
+    }
+
+    const brand = SdkConfig.get("brand");
+    const desktopBuilds = SdkConfig.getObject("desktop_builds");
 
     let text = null;
     let logo = null;
-    if (desktopBuilds.available) {
-        logo = <img src={desktopBuilds.logo} />;
+    if (desktopBuilds.get("available")) {
+        logo = <img src={desktopBuilds.get("logo")} />;
+        const buildUrl = desktopBuilds.get("url");
         switch (kind) {
             case WarningKind.Files:
                 text = _t("Use the <a>Desktop app</a> to see all encrypted files", {}, {
-                    a: sub => (<a href={desktopBuilds.url} target="_blank" rel="noreferrer noopener">{sub}</a>),
+                    a: sub => (<a href={buildUrl} target="_blank" rel="noreferrer noopener">{ sub }</a>),
                 });
                 break;
             case WarningKind.Search:
                 text = _t("Use the <a>Desktop app</a> to search encrypted messages", {}, {
-                    a: sub => (<a href={desktopBuilds.url} target="_blank" rel="noreferrer noopener">{sub}</a>),
+                    a: sub => (<a href={buildUrl} target="_blank" rel="noreferrer noopener">{ sub }</a>),
                 });
                 break;
         }
     } else {
         switch (kind) {
             case WarningKind.Files:
-                text = _t("This version of %(brand)s does not support viewing some encrypted files", {brand});
+                text = _t("This version of %(brand)s does not support viewing some encrypted files", { brand });
                 break;
             case WarningKind.Search:
-                text = _t("This version of %(brand)s does not support searching encrypted messages", {brand});
+                text = _t("This version of %(brand)s does not support searching encrypted messages", { brand });
                 break;
         }
     }
 
     // for safety
     if (!text) {
-        console.warn("Unknown desktop builds warning kind: ", kind);
+        logger.warn("Unknown desktop builds warning kind: ", kind);
         return null;
     }
 
     return (
         <div className="mx_DesktopBuildsNotice">
-            {logo}
-            <span>{text}</span>
+            { logo }
+            <span>{ text }</span>
         </div>
     );
 }

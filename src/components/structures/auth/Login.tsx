@@ -1,5 +1,5 @@
 /*
-Copyright 2015, 2016, 2017, 2018, 2019 The Matrix.org Foundation C.I.C.
+Copyright 2015-2021 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,28 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, {ReactNode} from 'react';
-import {MatrixError} from "matrix-js-sdk/src/http-api";
+import React, { ReactNode } from 'react';
+import { MatrixError } from "matrix-js-sdk/src/http-api";
+import classNames from "classnames";
+import { logger } from "matrix-js-sdk/src/logger";
 
-import {_t, _td} from '../../../languageHandler';
-import * as sdk from '../../../index';
-import Login, {ISSOFlow, LoginFlow} from '../../../Login';
+import { _t, _td } from '../../../languageHandler';
+import Login, { ISSOFlow, LoginFlow } from '../../../Login';
 import SdkConfig from '../../../SdkConfig';
 import { messageForResourceLimitError } from '../../../utils/ErrorUtils';
-import AutoDiscoveryUtils, {ValidatedServerConfig} from "../../../utils/AutoDiscoveryUtils";
-import classNames from "classnames";
+import AutoDiscoveryUtils, { ValidatedServerConfig } from "../../../utils/AutoDiscoveryUtils";
 import AuthPage from "../../views/auth/AuthPage";
 import PlatformPeg from '../../../PlatformPeg';
 import SettingsStore from "../../../settings/SettingsStore";
-import {UIFeature} from "../../../settings/UIFeature";
-import CountlyAnalytics from "../../../CountlyAnalytics";
-import {IMatrixClientCreds} from "../../../MatrixClientPeg";
+import { UIFeature } from "../../../settings/UIFeature";
+import { IMatrixClientCreds } from "../../../MatrixClientPeg";
 import PasswordLogin from "../../views/auth/PasswordLogin";
 import InlineSpinner from "../../views/elements/InlineSpinner";
 import Spinner from "../../views/elements/Spinner";
 import SSOButtons from "../../views/elements/SSOButtons";
 import ServerPicker from "../../views/elements/ServerPicker";
-import {replaceableComponent} from "../../../utils/replaceableComponent";
+import { replaceableComponent } from "../../../utils/replaceableComponent";
+import AuthBody from "../../views/auth/AuthBody";
+import AuthHeader from "../../views/auth/AuthHeader";
+import AccessibleButton from '../../views/elements/AccessibleButton';
 
 // These are used in several places, and come from the js-sdk's autodiscovery
 // stuff. We define them here so that they'll be picked up by i18n.
@@ -59,6 +61,7 @@ interface IProps {
     fallbackHsUrl?: string;
     defaultDeviceDisplayName?: string;
     fragmentAfterLogin?: string;
+    defaultUsername?: string;
 
     // Called when the user has logged in. Params:
     // - The object returned by the login API
@@ -94,7 +97,7 @@ interface IState {
     // be seeing.
     serverIsAlive: boolean;
     serverErrorIsFatal: boolean;
-    serverDeadError: string;
+    serverDeadError?: ReactNode;
 }
 
 /*
@@ -119,7 +122,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
 
             flows: null,
 
-            username: "",
+            username: props.defaultUsername? props.defaultUsername: '',
             phoneCountry: null,
             phoneNumber: "",
 
@@ -137,12 +140,10 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
             'm.login.cas': () => this.renderSsoStep("cas"),
             'm.login.sso': () => this.renderSsoStep("sso"),
         };
-
-        CountlyAnalytics.instance.track("onboarding_login_begin");
     }
 
     // TODO: [REACT-WARNING] Replace with appropriate lifecycle event
-    // eslint-disable-next-line camelcase
+    // eslint-disable-next-line
     UNSAFE_componentWillMount() {
         this.initLoginLogic(this.props.serverConfig);
     }
@@ -152,7 +153,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
     }
 
     // TODO: [REACT-WARNING] Replace with appropriate lifecycle event
-    // eslint-disable-next-line camelcase
+    // eslint-disable-next-line
     UNSAFE_componentWillReceiveProps(newProps) {
         if (newProps.serverConfig.hsUrl === this.props.serverConfig.hsUrl &&
             newProps.serverConfig.isUrl === this.props.serverConfig.isUrl) return;
@@ -165,7 +166,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
 
     onPasswordLogin = async (username, phoneCountry, phoneNumber, password) => {
         if (!this.state.serverIsAlive) {
-            this.setState({busy: true});
+            this.setState({ busy: true });
             // Do a quick liveliness check on the URLs
             let aliveAgain = true;
             try {
@@ -173,7 +174,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
                     this.props.serverConfig.hsUrl,
                     this.props.serverConfig.isUrl,
                 );
-                this.setState({serverIsAlive: true, errorText: ""});
+                this.setState({ serverIsAlive: true, errorText: "" });
             } catch (e) {
                 const componentState = AutoDiscoveryUtils.authComponentStateForError(e);
                 this.setState({
@@ -200,7 +201,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
         this.loginLogic.loginViaPassword(
             username, phoneCountry, phoneNumber, password,
         ).then((data) => {
-            this.setState({serverIsAlive: true}); // it must be, we logged in.
+            this.setState({ serverIsAlive: true }); // it must be, we logged in.
             this.props.onLoggedIn(data, password);
         }, (error) => {
             if (this.unmounted) {
@@ -237,22 +238,22 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
                 );
                 errorText = (
                     <div>
-                        <div>{errorTop}</div>
-                        <div className="mx_Login_smallError">{errorDetail}</div>
+                        <div>{ errorTop }</div>
+                        <div className="mx_Login_smallError">{ errorDetail }</div>
                     </div>
                 );
             } else if (error.httpStatus === 401 || error.httpStatus === 403) {
                 if (error.errcode === 'M_USER_DEACTIVATED') {
                     errorText = _t('This account has been deactivated.');
-                } else if (SdkConfig.get()['disable_custom_urls']) {
+                } else if (SdkConfig.get("disable_custom_urls")) {
                     errorText = (
                         <div>
                             <div>{ _t('Incorrect username and/or password.') }</div>
                             <div className="mx_Login_smallError">
-                                {_t(
+                                { _t(
                                     'Please note you are logging into the %(hs)s server, not matrix.org.',
-                                    {hs: this.props.serverConfig.hsName},
-                                )}
+                                    { hs: this.props.serverConfig.hsName },
+                                ) }
                             </div>
                         </div>
                     );
@@ -305,7 +306,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
                     busy: false,
                 });
             } catch (e) {
-                console.error("Problem parsing URL or unhandled error doing .well-known discovery:", e);
+                logger.error("Problem parsing URL or unhandled error doing .well-known discovery:", e);
 
                 let message = _t("Failed to perform homeserver discovery");
                 if (e.translatedMessage) {
@@ -362,7 +363,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
         }
     };
 
-    private async initLoginLogic({hsUrl, isUrl}: ValidatedServerConfig) {
+    private async initLoginLogic({ hsUrl, isUrl }: ValidatedServerConfig) {
         let isDefaultServer = false;
         if (this.props.serverConfig.isDefault
             && hsUrl === this.props.serverConfig.hsUrl
@@ -436,7 +437,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
         // technically the flow can have multiple steps, but no one does this
         // for login and loginLogic doesn't support it so we can ignore it.
         if (!this.stepRendererMap[flow.type]) {
-            console.log("Skipping flow", flow, "due to unsupported login type", flow.type);
+            logger.log("Skipping flow", flow, "due to unsupported login type", flow.type);
             return false;
         }
         return true;
@@ -451,7 +452,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
         let errorText: ReactNode = _t("There was a problem communicating with the homeserver, " +
             "please try again later.") + (errCode ? " (" + errCode + ")" : "");
 
-        if (err.cors === 'rejected') {
+        if (err["cors"] === 'rejected') { // browser-request specific error field
             if (window.location.protocol === 'https:' &&
                 (this.props.serverConfig.hsUrl.startsWith("http:") ||
                  !this.props.serverConfig.hsUrl.startsWith("http"))
@@ -461,7 +462,9 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
                         "Either use HTTPS or <a>enable unsafe scripts</a>.", {},
                     {
                         'a': (sub) => {
-                            return <a target="_blank" rel="noreferrer noopener"
+                            return <a
+                                target="_blank"
+                                rel="noreferrer noopener"
                                 href="https://www.google.com/search?&q=enable%20unsafe%20scripts"
                             >
                                 { sub }
@@ -500,9 +503,9 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
         return <React.Fragment>
             { flows.map(flow => {
                 const stepRenderer = this.stepRendererMap[flow.type];
-                return <React.Fragment key={flow.type}>{ stepRenderer() }</React.Fragment>
+                return <React.Fragment key={flow.type}>{ stepRenderer() }</React.Fragment>;
             }) }
-        </React.Fragment>
+        </React.Fragment>;
     }
 
     private renderPasswordStep = () => {
@@ -540,8 +543,6 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
     };
 
     render() {
-        const AuthHeader = sdk.getComponent("auth.AuthHeader");
-        const AuthBody = sdk.getComponent("auth.AuthBody");
         const loader = this.isBusy() && !this.state.busyLoggingIn ?
             <div className="mx_Login_loader"><Spinner /></div> : null;
 
@@ -565,7 +566,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
             });
             serverDeadSection = (
                 <div className={classes}>
-                    {this.state.serverDeadError}
+                    { this.state.serverDeadError }
                 </div>
             );
         }
@@ -578,7 +579,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
                     { this.props.isSyncing ? _t("Syncing...") : _t("Signing In...") }
                 </div>
                 { this.props.isSyncing && <div className="mx_AuthBody_paddedFooter_subtitle">
-                    {_t("If you've joined lots of rooms, this might take a while")}
+                    { _t("If you've joined lots of rooms, this might take a while") }
                 </div> }
             </div>;
         }
@@ -588,8 +589,8 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
                 <AuthHeader disableLanguageSelector={this.props.isSyncing || this.state.busyLoggingIn} />
                 <AuthBody>
                     <h2>
-                        {_t('Sign in')}
-                        {loader}
+                        { _t('Sign in') }
+                        { loader }
                     </h2>
                     { errorTextSection }
                     { serverDeadSection }

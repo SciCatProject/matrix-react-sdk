@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {MatrixClientPeg as peg} from '../../../src/MatrixClientPeg';
+import { MatrixClientPeg as peg } from '../../../src/MatrixClientPeg';
 import {
     makeGroupPermalink,
     makeRoomPermalink,
@@ -34,7 +34,7 @@ function mockRoom(roomId, members, serverACL) {
 
     return {
         roomId,
-        getCanonicalAlias: () => roomId,
+        getCanonicalAlias: () => null,
         getJoinedMembers: () => members,
         getMember: (userId) => members.find(m => m.userId === userId),
         currentState: {
@@ -48,7 +48,7 @@ function mockRoom(roomId, members, serverACL) {
                         content = serverACL;
                         break;
                     case "m.room.power_levels":
-                        content = {users: powerLevelsUsers, users_default: 0};
+                        content = { users: powerLevelsUsers, users_default: 0 };
                         break;
                 }
                 if (content) {
@@ -103,29 +103,33 @@ describe('Permalinks', function() {
     });
 
     it('should change candidate server when highest power level user leaves the room', function() {
+        const roomId = "!fake:example.org";
         const member95 = {
             userId: "@alice:pl_95",
             powerLevel: 95,
+            roomId,
         };
-        const room = mockRoom("!fake:example.org", [
+        const room = mockRoom(roomId, [
             {
                 userId: "@alice:pl_50",
                 powerLevel: 50,
+                roomId,
             },
             {
                 userId: "@alice:pl_75",
                 powerLevel: 75,
+                roomId,
             },
             member95,
         ]);
-        const creator = new RoomPermalinkCreator(room);
+        const creator = new RoomPermalinkCreator(room, null);
         creator.load();
         expect(creator._serverCandidates[0]).toBe("pl_95");
         member95.membership = "left";
-        creator.onMembership({}, member95, "join");
+        creator.onRoomStateUpdate();
         expect(creator._serverCandidates[0]).toBe("pl_75");
         member95.membership = "join";
-        creator.onMembership({}, member95, "left");
+        creator.onRoomStateUpdate();
         expect(creator._serverCandidates[0]).toBe("pl_95");
     });
 

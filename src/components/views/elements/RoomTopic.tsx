@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import React, {useEffect, useState} from "react";
-import {EventType} from "matrix-js-sdk/src/@types/event";
-import {Room} from "matrix-js-sdk/src/models/room";
+import React, { useEffect, useState } from "react";
+import { EventType } from "matrix-js-sdk/src/@types/event";
+import { Room } from "matrix-js-sdk/src/models/room";
+import { RoomStateEvent } from "matrix-js-sdk/src/models/room-state";
+import { MatrixEvent } from "matrix-js-sdk/src/models/event";
 
-import {useEventEmitter} from "../../../hooks/useEventEmitter";
-import {linkifyElement} from "../../../HtmlUtils";
+import { useTypedEventEmitter } from "../../../hooks/useEventEmitter";
+import { linkifyElement } from "../../../HtmlUtils";
 
 interface IProps {
     room?: Room;
@@ -30,7 +32,8 @@ export const getTopic = room => room?.currentState?.getStateEvents(EventType.Roo
 
 const RoomTopic = ({ room, children }: IProps): JSX.Element => {
     const [topic, setTopic] = useState(getTopic(room));
-    useEventEmitter(room.currentState, "RoomState.events", () => {
+    useTypedEventEmitter(room.currentState, RoomStateEvent.Events, (ev: MatrixEvent) => {
+        if (ev.getType() !== EventType.RoomTopic) return;
         setTopic(getTopic(room));
     });
     useEffect(() => {

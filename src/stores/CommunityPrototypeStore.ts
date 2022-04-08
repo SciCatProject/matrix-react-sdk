@@ -14,19 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Room } from "matrix-js-sdk/src/models/room";
+import * as utils from "matrix-js-sdk/src/utils";
+import { isNullOrUndefined } from "matrix-js-sdk/src/utils";
+import { logger } from "matrix-js-sdk/src/logger";
+import { Method } from "matrix-js-sdk/src/http-api";
+
 import { AsyncStoreWithClient } from "./AsyncStoreWithClient";
 import defaultDispatcher from "../dispatcher/dispatcher";
 import { ActionPayload } from "../dispatcher/payloads";
-import { Room } from "matrix-js-sdk/src/models/room";
+import { Action } from "../dispatcher/actions";
 import { EffectiveMembership, getEffectiveMembership } from "../utils/membership";
 import SettingsStore from "../settings/SettingsStore";
-import * as utils from "matrix-js-sdk/src/utils";
 import { UPDATE_EVENT } from "./AsyncStore";
 import FlairStore from "./FlairStore";
 import GroupFilterOrderStore from "./GroupFilterOrderStore";
 import GroupStore from "./GroupStore";
 import dis from "../dispatcher/dispatcher";
-import { isNullOrUndefined } from "matrix-js-sdk/src/utils";
+import { ViewRoomPayload } from "../dispatcher/payloads/ViewRoomPayload";
 
 interface IState {
     // nothing of value - we use account data
@@ -107,8 +112,9 @@ export class CommunityPrototypeStore extends AsyncStoreWithClient<IState> {
 
         const pl = generalChat.currentState.getStateEvents("m.room.power_levels", "");
         if (!pl) return this.isAdminOf(communityId);
+        const plContent = pl.getContent();
 
-        const invitePl = isNullOrUndefined(pl.invite) ? 50 : Number(pl.invite);
+        const invitePl = isNullOrUndefined(plContent.invite) ? 50 : Number(plContent.invite);
         return invitePl <= myMember.powerLevel;
     }
 
@@ -125,15 +131,15 @@ export class CommunityPrototypeStore extends AsyncStoreWithClient<IState> {
 
             if (membership === EffectiveMembership.Invite) {
                 try {
-                    const path = utils.encodeUri("/rooms/$roomId/group_info", {$roomId: room.roomId});
-                    const profile = await this.matrixClient._http.authedRequest(
-                        undefined, "GET", path,
+                    const path = utils.encodeUri("/rooms/$roomId/group_info", { $roomId: room.roomId });
+                    const profile = await this.matrixClient.http.authedRequest(
+                        undefined, Method.Get, path,
                         undefined, undefined,
-                        {prefix: "/_matrix/client/unstable/im.vector.custom"});
+                        { prefix: "/_matrix/client/unstable/im.vector.custom" });
                     // we use global account data because per-room account data on invites is unreliable
                     await this.matrixClient.setAccountData("im.vector.group_info." + room.roomId, profile);
                 } catch (e) {
-                    console.warn("Non-fatal error getting group information for invite:", e);
+                    logger.warn("Non-fatal error getting group information for invite:", e);
                 }
             }
         } else if (payload.action === "MatrixActions.accountData") {
@@ -145,24 +151,31 @@ export class CommunityPrototypeStore extends AsyncStoreWithClient<IState> {
             // Automatically select the general chat when switching communities
             const chat = this.getGeneralChat(payload.tag);
             if (chat) {
-                dis.dispatch({
-                    action: 'view_room',
+                dis.dispatch<ViewRoomPayload>({
+                    action: Action.ViewRoom,
                     room_id: chat.roomId,
+                    metricsTrigger: undefined, // Deprecated groups
                 });
             }
         }
     }
 
     public getInviteProfile(roomId: string): IRoomProfile {
-        if (!this.matrixClient) return {displayName: null, avatarMxc: null};
+        if (!this.matrixClient) return { displayName: null, avatarMxc: null };
         const room = this.matrixClient.getRoom(roomId);
         if (SettingsStore.getValue("feature_communities_v2_prototypes")) {
             const data = this.matrixClient.getAccountData("im.vector.group_info." + roomId);
             if (data && data.getContent()) {
-                return {displayName: data.getContent().name, avatarMxc: data.getContent().avatar_url};
+                return {
+                    displayName: data.getContent().name,
+                    avatarMxc: data.getContent().avatar_url,
+                };
             }
         }
-        return {displayName: room.name, avatarMxc: room.avatar_url};
+        return {
+            displayName: room.name,
+            avatarMxc: room.getMxcAvatarUrl(),
+        };
     }
 
     protected async onReady(): Promise<any> {

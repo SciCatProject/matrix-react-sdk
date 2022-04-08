@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {TextEncoder} from "util";
+import { TextEncoder } from "util";
 import nodeCrypto from "crypto";
 import { Crypto } from "@peculiar/webcrypto";
 
@@ -84,22 +84,22 @@ describe('MegolmExportEncryption', function() {
         it('should handle missing header', function() {
             const input=stringToArray(`-----`);
             return MegolmExportEncryption.decryptMegolmKeyFile(input, '')
-            .then((res) => {
-                throw new Error('expected to throw');
-            }, (error) => {
-                expect(error.message).toEqual('Header line not found');
-            });
+                .then((res) => {
+                    throw new Error('expected to throw');
+                }, (error) => {
+                    expect(error.message).toEqual('Header line not found');
+                });
         });
 
         it('should handle missing trailer', function() {
             const input=stringToArray(`-----BEGIN MEGOLM SESSION DATA-----
 -----`);
             return MegolmExportEncryption.decryptMegolmKeyFile(input, '')
-            .then((res) => {
-                throw new Error('expected to throw');
-            }, (error) => {
-                expect(error.message).toEqual('Trailer line not found');
-            });
+                .then((res) => {
+                    throw new Error('expected to throw');
+                }, (error) => {
+                    expect(error.message).toEqual('Trailer line not found');
+                });
         });
 
         it('should handle a too-short body', function() {
@@ -109,18 +109,17 @@ cissyYBxjsfsAn
 -----END MEGOLM SESSION DATA-----
 `);
             return MegolmExportEncryption.decryptMegolmKeyFile(input, '')
-            .then((res) => {
-                throw new Error('expected to throw');
-            }, (error) => {
-                expect(error.message).toEqual('Invalid file: too short');
-            });
+                .then((res) => {
+                    throw new Error('expected to throw');
+                }, (error) => {
+                    expect(error.message).toEqual('Invalid file: too short');
+                });
         });
 
         // TODO find a subtlecrypto shim which doesn't break this test
-        it.skip('should decrypt a range of inputs', function(done) {
+        it.skip('should decrypt a range of inputs', function() {
             function next(i) {
                 if (i >= TEST_VECTORS.length) {
-                    done();
                     return;
                 }
 
@@ -132,27 +131,26 @@ cissyYBxjsfsAn
                     return next(i+1);
                 });
             }
-            return next(0).catch(done);
+            return next(0);
         });
     });
 
     describe('encrypt', function() {
-        it('should round-trip', function(done) {
+        it('should round-trip', function() {
             const input =
                   'words words many words in plain text here'.repeat(100);
 
             const password = 'my super secret passphrase';
 
             return MegolmExportEncryption.encryptMegolmKeyFile(
-                input, password, {kdf_rounds: 1000},
+                input, password, { kdf_rounds: 1000 },
             ).then((ciphertext) => {
                 return MegolmExportEncryption.decryptMegolmKeyFile(
                     ciphertext, password,
                 );
             }).then((plaintext) => {
                 expect(plaintext).toEqual(input);
-                done();
-            }).catch(done);
+            });
         });
     });
 });

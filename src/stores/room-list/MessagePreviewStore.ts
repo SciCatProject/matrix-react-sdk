@@ -15,12 +15,16 @@ limitations under the License.
 */
 
 import { Room } from "matrix-js-sdk/src/models/room";
+import { isNullOrUndefined } from "matrix-js-sdk/src/utils";
+import { MatrixEvent } from "matrix-js-sdk/src/models/event";
+import { M_POLL_START } from "matrix-events-sdk";
+
 import { ActionPayload } from "../../dispatcher/payloads";
 import { AsyncStoreWithClient } from "../AsyncStoreWithClient";
 import defaultDispatcher from "../../dispatcher/dispatcher";
 import { MessageEventPreview } from "./previews/MessageEventPreview";
+import { PollStartEventPreview } from "./previews/PollStartEventPreview";
 import { TagID } from "./models";
-import { isNullOrUndefined } from "matrix-js-sdk/src/utils";
 import { CallInviteEventPreview } from "./previews/CallInviteEventPreview";
 import { CallAnswerEventPreview } from "./previews/CallAnswerEventPreview";
 import { CallHangupEvent } from "./previews/CallHangupEvent";
@@ -57,13 +61,21 @@ const PREVIEWS = {
         isState: false,
         previewer: new ReactionEventPreview(),
     },
+    [M_POLL_START.name]: {
+        isState: false,
+        previewer: new PollStartEventPreview(),
+    },
+    [M_POLL_START.altName]: {
+        isState: false,
+        previewer: new PollStartEventPreview(),
+    },
 };
 
 // The maximum number of events we're willing to look back on to get a preview.
 const MAX_EVENTS_BACKWARDS = 50;
 
 // type merging ftw
-type TAG_ANY = "im.vector.any";
+type TAG_ANY = "im.vector.any"; // eslint-disable-line @typescript-eslint/naming-convention
 const TAG_ANY: TAG_ANY = "im.vector.any";
 
 interface IState {
@@ -94,10 +106,10 @@ export class MessagePreviewStore extends AsyncStoreWithClient<IState> {
      * @param inTagId The tag ID in which the room resides
      * @returns The preview, or null if none present.
      */
-    public getPreviewForRoom(room: Room, inTagId: TagID): string {
+    public async getPreviewForRoom(room: Room, inTagId: TagID): Promise<string> {
         if (!room) return null; // invalid room, just return nothing
 
-        if (!this.previews.has(room.roomId)) this.generatePreview(room, inTagId);
+        if (!this.previews.has(room.roomId)) await this.generatePreview(room, inTagId);
 
         const previews = this.previews.get(room.roomId);
         if (!previews) return null;
@@ -108,7 +120,15 @@ export class MessagePreviewStore extends AsyncStoreWithClient<IState> {
         return previews.get(inTagId);
     }
 
-    private generatePreview(room: Room, tagId?: TagID) {
+    public generatePreviewForEvent(event: MatrixEvent): string {
+        const previewDef = PREVIEWS[event.getType()];
+        // TODO: Handle case where we don't have
+        if (!previewDef) return '';
+        const previewText = previewDef.previewer.getTextFor(event, null, true);
+        return previewText ?? '';
+    }
+
+    private async generatePreview(room: Room, tagId?: TagID) {
         const events = room.timeline;
         if (!events) return; // should only happen in tests
 
@@ -130,6 +150,9 @@ export class MessagePreviewStore extends AsyncStoreWithClient<IState> {
             }
 
             const event = events[i];
+
+            await this.matrixClient.decryptEventIfNeeded(event);
+
             const previewDef = PREVIEWS[event.getType()];
             if (!previewDef) continue;
             if (previewDef.isState && isNullOrUndefined(event.getStateKey())) continue;
@@ -173,8 +196,9 @@ export class MessagePreviewStore extends AsyncStoreWithClient<IState> {
 
         if (payload.action === 'MatrixActions.Room.timeline' || payload.action === 'MatrixActions.Event.decrypted') {
             const event = payload.event; // TODO: Type out the dispatcher
-            if (!this.previews.has(event.getRoomId())) return; // not important
-            this.generatePreview(this.matrixClient.getRoom(event.getRoomId()), TAG_ANY);
+            const isHistoricalEvent = payload.hasOwnProperty("isLiveEvent") && !payload.isLiveEvent;
+            if (!this.previews.has(event.getRoomId()) || isHistoricalEvent) return; // not important
+            await this.generatePreview(this.matrixClient.getRoom(event.getRoomId()), TAG_ANY);
         }
     }
 }
