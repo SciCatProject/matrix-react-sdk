@@ -19,16 +19,15 @@ limitations under the License.
 import { MatrixClient } from "matrix-js-sdk/src/client";
 import { IUploadOpts } from "matrix-js-sdk/src/@types/requests";
 import { MsgType } from "matrix-js-sdk/src/@types/event";
-import encrypt from "browser-encrypt-attachment";
+import encrypt from "matrix-encrypt-attachment";
 import extractPngChunks from "png-chunks-extract";
 import { IAbortablePromise, IImageInfo } from "matrix-js-sdk/src/@types/partials";
 import { logger } from "matrix-js-sdk/src/logger";
-import { IEventRelation, ISendEventResponse, MatrixEvent } from "matrix-js-sdk/src/matrix";
+import { IEventRelation, ISendEventResponse, MatrixError, MatrixEvent } from "matrix-js-sdk/src/matrix";
 import { THREAD_RELATION_TYPE } from "matrix-js-sdk/src/models/thread";
 
 import { IEncryptedFile, IMediaEventInfo } from "./customisations/models/IMediaEventContent";
 import dis from './dispatcher/dispatcher';
-import * as sdk from './index';
 import { _t } from './languageHandler';
 import Modal from './Modal';
 import Spinner from "./components/views/elements/Spinner";
@@ -41,25 +40,22 @@ import {
     UploadStartedPayload,
 } from "./dispatcher/payloads/UploadPayload";
 import { IUpload } from "./models/IUpload";
-import { BlurhashEncoder } from "./BlurhashEncoder";
 import SettingsStore from "./settings/SettingsStore";
 import { decorateStartSendingTime, sendRoundTripMetric } from "./sendTimePerformanceMetrics";
 import { TimelineRenderingType } from "./contexts/RoomContext";
-import RoomViewStore from "./stores/RoomViewStore";
+import { RoomViewStore } from "./stores/RoomViewStore";
 import { addReplyToMessageContent } from "./utils/Reply";
-
-const MAX_WIDTH = 800;
-const MAX_HEIGHT = 600;
+import ErrorDialog from "./components/views/dialogs/ErrorDialog";
+import UploadFailureDialog from "./components/views/dialogs/UploadFailureDialog";
+import UploadConfirmDialog from "./components/views/dialogs/UploadConfirmDialog";
+import { createThumbnail } from "./utils/image-media";
+import { attachRelation } from "./components/views/rooms/SendMessageComposer";
 
 // scraped out of a macOS hidpi (5660ppm) screenshot png
 //                  5669 px (x-axis)      , 5669 px (y-axis)      , per metre
 const PHYS_HIDPI = [0x00, 0x00, 0x16, 0x25, 0x00, 0x00, 0x16, 0x25, 0x01];
 
-export const BLURHASH_FIELD = "xyz.amorgan.blurhash"; // MSC2448
-
 export class UploadCanceledError extends Error {}
-
-type ThumbnailableElement = HTMLImageElement | HTMLVideoElement;
 
 interface IMediaConfig {
     "m.upload.size"?: number;
@@ -68,107 +64,9 @@ interface IMediaConfig {
 interface IContent {
     body: string;
     msgtype: string;
-    info: {
-        size: number;
-        mimetype?: string;
-    };
+    info: IMediaEventInfo;
     file?: string;
     url?: string;
-}
-
-interface IThumbnail {
-    info: {
-        // eslint-disable-next-line camelcase
-        thumbnail_info: {
-            w: number;
-            h: number;
-            mimetype: string;
-            size: number;
-        };
-        w: number;
-        h: number;
-        [BLURHASH_FIELD]: string;
-    };
-    thumbnail: Blob;
-}
-
-/**
- * Create a thumbnail for a image DOM element.
- * The image will be smaller than MAX_WIDTH and MAX_HEIGHT.
- * The thumbnail will have the same aspect ratio as the original.
- * Draws the element into a canvas using CanvasRenderingContext2D.drawImage
- * Then calls Canvas.toBlob to get a blob object for the image data.
- *
- * Since it needs to calculate the dimensions of the source image and the
- * thumbnailed image it returns an info object filled out with information
- * about the original image and the thumbnail.
- *
- * @param {HTMLElement} element The element to thumbnail.
- * @param {number} inputWidth The width of the image in the input element.
- * @param {number} inputHeight the width of the image in the input element.
- * @param {String} mimeType The mimeType to save the blob as.
- * @return {Promise} A promise that resolves with an object with an info key
- *  and a thumbnail key.
- */
-async function createThumbnail(
-    element: ThumbnailableElement,
-    inputWidth: number,
-    inputHeight: number,
-    mimeType: string,
-): Promise<IThumbnail> {
-    let targetWidth = inputWidth;
-    let targetHeight = inputHeight;
-    if (targetHeight > MAX_HEIGHT) {
-        targetWidth = Math.floor(targetWidth * (MAX_HEIGHT / targetHeight));
-        targetHeight = MAX_HEIGHT;
-    }
-    if (targetWidth > MAX_WIDTH) {
-        targetHeight = Math.floor(targetHeight * (MAX_WIDTH / targetWidth));
-        targetWidth = MAX_WIDTH;
-    }
-
-    let canvas: HTMLCanvasElement | OffscreenCanvas;
-    let context: CanvasRenderingContext2D;
-    try {
-        canvas = new window.OffscreenCanvas(targetWidth, targetHeight);
-        context = canvas.getContext("2d");
-    } catch (e) {
-        // Fallback support for other browsers (Safari and Firefox for now)
-        canvas = document.createElement("canvas");
-        (canvas as HTMLCanvasElement).width = targetWidth;
-        (canvas as HTMLCanvasElement).height = targetHeight;
-        context = canvas.getContext("2d");
-    }
-
-    context.drawImage(element, 0, 0, targetWidth, targetHeight);
-
-    let thumbnailPromise: Promise<Blob>;
-
-    if (window.OffscreenCanvas) {
-        thumbnailPromise = (canvas as OffscreenCanvas).convertToBlob({ type: mimeType });
-    } else {
-        thumbnailPromise = new Promise<Blob>(resolve => (canvas as HTMLCanvasElement).toBlob(resolve, mimeType));
-    }
-
-    const imageData = context.getImageData(0, 0, targetWidth, targetHeight);
-    // thumbnailPromise and blurhash promise are being awaited concurrently
-    const blurhash = await BlurhashEncoder.instance.getBlurhash(imageData);
-    const thumbnail = await thumbnailPromise;
-
-    return {
-        info: {
-            thumbnail_info: {
-                w: targetWidth,
-                h: targetHeight,
-                mimetype: thumbnail.type,
-                size: thumbnail.size,
-            },
-            w: inputWidth,
-            h: inputHeight,
-            [BLURHASH_FIELD]: blurhash,
-        },
-        thumbnail,
-    };
 }
 
 /**
@@ -228,6 +126,9 @@ const IMAGE_THUMBNAIL_MIN_REDUCTION_PERCENT = 0.1; // 10%
 // We don't apply these thresholds to video thumbnails as a poster image is always useful
 // and videos tend to be much larger.
 
+// Image mime types for which to always include a thumbnail for even if it is larger than the input for wider support.
+const ALWAYS_INCLUDE_THUMBNAIL = ["image/avif", "image/webp"];
+
 /**
  * Read the metadata for an image file and create and upload a thumbnail of the image.
  *
@@ -236,7 +137,11 @@ const IMAGE_THUMBNAIL_MIN_REDUCTION_PERCENT = 0.1; // 10%
  * @param {File} imageFile The image to read and thumbnail.
  * @return {Promise} A promise that resolves with the attachment info.
  */
-async function infoForImageFile(matrixClient: MatrixClient, roomId: string, imageFile: File) {
+async function infoForImageFile(
+    matrixClient: MatrixClient,
+    roomId: string,
+    imageFile: File,
+): Promise<Partial<IMediaEventInfo>> {
     let thumbnailType = "image/png";
     if (imageFile.type === "image/jpeg") {
         thumbnailType = "image/jpeg";
@@ -247,15 +152,20 @@ async function infoForImageFile(matrixClient: MatrixClient, roomId: string, imag
     const result = await createThumbnail(imageElement.img, imageElement.width, imageElement.height, thumbnailType);
     const imageInfo = result.info;
 
-    // we do all sizing checks here because we still rely on thumbnail generation for making a blurhash from.
-    const sizeDifference = imageFile.size - imageInfo.thumbnail_info.size;
-    if (
-        imageFile.size <= IMAGE_SIZE_THRESHOLD_THUMBNAIL || // image is small enough already
-        (sizeDifference <= IMAGE_THUMBNAIL_MIN_REDUCTION_SIZE && // thumbnail is not sufficiently smaller than original
-            sizeDifference <= (imageFile.size * IMAGE_THUMBNAIL_MIN_REDUCTION_PERCENT))
-    ) {
-        delete imageInfo["thumbnail_info"];
-        return imageInfo;
+    // For lesser supported image types, always include the thumbnail even if it is larger
+    if (!ALWAYS_INCLUDE_THUMBNAIL.includes(imageFile.type)) {
+        // we do all sizing checks here because we still rely on thumbnail generation for making a blurhash from.
+        const sizeDifference = imageFile.size - imageInfo.thumbnail_info.size;
+        if (
+            // image is small enough already
+            imageFile.size <= IMAGE_SIZE_THRESHOLD_THUMBNAIL ||
+            // thumbnail is not sufficiently smaller than original
+            (sizeDifference <= IMAGE_THUMBNAIL_MIN_REDUCTION_SIZE &&
+                sizeDifference <= (imageFile.size * IMAGE_THUMBNAIL_MIN_REDUCTION_PERCENT))
+        ) {
+            delete imageInfo["thumbnail_info"];
+            return imageInfo;
+        }
     }
 
     const uploadResult = await uploadFile(matrixClient, roomId, result.thumbnail);
@@ -272,7 +182,7 @@ async function infoForImageFile(matrixClient: MatrixClient, roomId: string, imag
  * @param {File} videoFile The file to load in an video element.
  * @return {Promise} A promise that resolves with the video image element.
  */
-function loadVideoElement(videoFile): Promise<HTMLVideoElement> {
+function loadVideoElement(videoFile: File): Promise<HTMLVideoElement> {
     return new Promise((resolve, reject) => {
         // Load the file into an html element
         const video = document.createElement("video");
@@ -318,7 +228,11 @@ function loadVideoElement(videoFile): Promise<HTMLVideoElement> {
  * @param {File} videoFile The video to read and thumbnail.
  * @return {Promise} A promise that resolves with the attachment info.
  */
-function infoForVideoFile(matrixClient, roomId, videoFile) {
+function infoForVideoFile(
+    matrixClient: MatrixClient,
+    roomId: string,
+    videoFile: File,
+): Promise<Partial<IMediaEventInfo>> {
     const thumbnailType = "image/jpeg";
 
     let videoInfo: Partial<IMediaEventInfo>;
@@ -464,7 +378,7 @@ export default class ContentMessages {
             return;
         }
 
-        const replyToEvent = RoomViewStore.getQuotingEvent();
+        const replyToEvent = RoomViewStore.instance.getQuotingEvent();
         if (!this.mediaConfig) { // hot-path optimization to not flash a spinner if we don't need to
             const modal = Modal.createDialog(Spinner, null, 'mx_Dialog_spinner');
             await this.ensureMediaConfigFetched(matrixClient);
@@ -474,17 +388,15 @@ export default class ContentMessages {
         const tooBigFiles = [];
         const okFiles = [];
 
-        for (let i = 0; i < files.length; ++i) {
-            if (this.isFileSizeAcceptable(files[i])) {
-                okFiles.push(files[i]);
+        for (const file of files) {
+            if (this.isFileSizeAcceptable(file)) {
+                okFiles.push(file);
             } else {
-                tooBigFiles.push(files[i]);
+                tooBigFiles.push(file);
             }
         }
 
         if (tooBigFiles.length > 0) {
-            // FIXME: Using an import will result in Element crashing
-            const UploadFailureDialog = sdk.getComponent("dialogs.UploadFailureDialog");
             const { finished } = Modal.createTrackedDialog<[boolean]>('Upload Failure', '', UploadFailureDialog, {
                 badFiles: tooBigFiles,
                 totalFiles: files.length,
@@ -501,8 +413,6 @@ export default class ContentMessages {
         for (let i = 0; i < okFiles.length; ++i) {
             const file = okFiles[i];
             if (!uploadAll) {
-                // FIXME: Using an import will result in Element crashing
-                const UploadConfirmDialog = sdk.getComponent("dialogs.UploadConfirmDialog");
                 const { finished } = Modal.createTrackedDialog<[boolean, boolean]>('Upload Files confirmation',
                     '', UploadConfirmDialog, {
                         file,
@@ -547,14 +457,8 @@ export default class ContentMessages {
         });
     }
 
-    public cancelUpload(promise: Promise<any>, matrixClient: MatrixClient): void {
-        let upload: IUpload;
-        for (let i = 0; i < this.inprogress.length; ++i) {
-            if (this.inprogress[i].promise === promise) {
-                upload = this.inprogress[i];
-                break;
-            }
-        }
+    public cancelUpload(promise: IAbortablePromise<any>, matrixClient: MatrixClient): void {
+        const upload = this.inprogress.find(item => item.promise === promise);
         if (upload) {
             upload.canceled = true;
             matrixClient.cancelUpload(upload.promise);
@@ -570,18 +474,15 @@ export default class ContentMessages {
         replyToEvent: MatrixEvent | undefined,
         promBefore: Promise<any>,
     ) {
-        const content: IContent = {
+        const content: Omit<IContent, "info"> & { info: Partial<IMediaEventInfo> } = {
             body: file.name || 'Attachment',
             info: {
                 size: file.size,
             },
-            msgtype: "", // set later
+            msgtype: MsgType.File, // set more specifically later
         };
 
-        if (relation) {
-            content["m.relates_to"] = relation;
-        }
-
+        attachRelation(content, relation);
         if (replyToEvent) {
             addReplyToMessageContent(content, replyToEvent, {
                 includeLegacyFallback: false,
@@ -604,6 +505,7 @@ export default class ContentMessages {
                     Object.assign(content.info, imageInfo);
                     resolve();
                 }, (e) => {
+                    // Failed to thumbnail, fall back to uploading an m.file
                     logger.error(e);
                     content.msgtype = MsgType.File;
                     resolve();
@@ -617,6 +519,8 @@ export default class ContentMessages {
                     Object.assign(content.info, videoInfo);
                     resolve();
                 }, (e) => {
+                    // Failed to thumbnail, fall back to uploading an m.file
+                    logger.error(e);
                     content.msgtype = MsgType.File;
                     resolve();
                 });
@@ -648,8 +552,8 @@ export default class ContentMessages {
             dis.dispatch<UploadProgressPayload>({ action: Action.UploadProgress, upload });
         }
 
-        let error;
-        return prom.then(function() {
+        let error: MatrixError;
+        return prom.then(() => {
             if (upload.canceled) throw new UploadCanceledError();
             // XXX: upload.promise must be the promise that
             // is returned by uploadFile as it has an abort()
@@ -674,18 +578,16 @@ export default class ContentMessages {
                 });
             }
             return prom;
-        }, function(err) {
+        }, function(err: MatrixError) {
             error = err;
             if (!upload.canceled) {
                 let desc = _t("The file '%(fileName)s' failed to upload.", { fileName: upload.fileName });
-                if (err.http_status === 413) {
+                if (err.httpStatus === 413) {
                     desc = _t(
                         "The file '%(fileName)s' exceeds this homeserver's size limit for uploads",
                         { fileName: upload.fileName },
                     );
                 }
-                // FIXME: Using an import will result in Element crashing
-                const ErrorDialog = sdk.getComponent("dialogs.ErrorDialog");
                 Modal.createTrackedDialog('Upload failed', '', ErrorDialog, {
                     title: _t('Upload Failed'),
                     description: desc,
@@ -702,7 +604,7 @@ export default class ContentMessages {
                 // 413: File was too big or upset the server in some way:
                 // clear the media size limit so we fetch it again next time
                 // we try to upload
-                if (error && error.http_status === 413) {
+                if (error?.httpStatus === 413) {
                     this.mediaConfig = null;
                 }
                 dis.dispatch<UploadErrorPayload>({ action: Action.UploadFailed, upload, error });
@@ -722,7 +624,7 @@ export default class ContentMessages {
         return true;
     }
 
-    private ensureMediaConfigFetched(matrixClient: MatrixClient) {
+    private ensureMediaConfigFetched(matrixClient: MatrixClient): Promise<void> {
         if (this.mediaConfig !== null) return;
 
         logger.log("[Media Config] Fetching");

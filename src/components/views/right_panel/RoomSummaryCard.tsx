@@ -42,7 +42,7 @@ import { UIComponent, UIFeature } from "../../../settings/UIFeature";
 import { ChevronFace, ContextMenuTooltipButton, useContextMenu } from "../../structures/ContextMenu";
 import WidgetContextMenu from "../context_menus/WidgetContextMenu";
 import { useRoomMemberCount } from "../../../hooks/useRoomMembers";
-import { useSettingValue } from "../../../hooks/useSettings";
+import { useFeatureEnabled } from "../../../hooks/useSettings";
 import { usePinnedEvents } from "./PinnedMessagesCard";
 import { Container, MAX_PINNED, WidgetLayoutStore } from "../../../stores/widgets/WidgetLayoutStore";
 import RoomName from "../elements/RoomName";
@@ -166,7 +166,6 @@ const AppRow: React.FC<IAppRowProps> = ({ app, room }) => {
             title={openTitle}
             forceHide={!(isPinned || isMaximised)}
             disabled={isPinned || isMaximised}
-            yOffset={-48}
         >
             <WidgetAvatar app={app} />
             <span>{ name }</span>
@@ -178,7 +177,6 @@ const AppRow: React.FC<IAppRowProps> = ({ app, room }) => {
             isExpanded={menuDisplayed}
             onClick={openMenu}
             title={_t("Options")}
-            yOffset={-24}
         /> }
 
         <AccessibleTooltipButton
@@ -186,13 +184,11 @@ const AppRow: React.FC<IAppRowProps> = ({ app, room }) => {
             onClick={togglePin}
             title={pinTitle}
             disabled={cannotPin}
-            yOffset={-24}
         />
         <AccessibleTooltipButton
             className="mx_RoomSummaryCard_app_maximiseToggle"
             onClick={toggleMaximised}
             title={maximiseTitle}
-            yOffset={-24}
         />
 
         { contextMenu }
@@ -207,11 +203,8 @@ const AppsSection: React.FC<IAppsSectionProps> = ({ room }) => {
         if (!managers.hasManager()) {
             managers.openNoManagerDialog();
         } else {
-            if (SettingsStore.getValue("feature_many_integration_managers")) {
-                managers.openAll(room);
-            } else {
-                managers.getPrimaryManager().open(room);
-            }
+            // noinspection JSIgnoredPromiseFromCall
+            managers.getPrimaryManager().open(room);
         }
     };
 
@@ -269,6 +262,7 @@ const RoomSummaryCard: React.FC<IProps> = ({ room, onClose }) => {
     const isRoomEncrypted = useIsEncrypted(cli, room);
     const roomContext = useContext(RoomContext);
     const e2eStatus = roomContext.e2eStatus;
+    const isVideoRoom = useFeatureEnabled("feature_video_rooms") && room.isElementVideoRoom();
 
     const alias = room.getCanonicalAlias() || room.getAltAliases()[0] || "";
     const header = <React.Fragment>
@@ -297,7 +291,7 @@ const RoomSummaryCard: React.FC<IProps> = ({ room, onClose }) => {
     </React.Fragment>;
 
     const memberCount = useRoomMemberCount(room);
-    const pinningEnabled = useSettingValue("feature_pinning");
+    const pinningEnabled = useFeatureEnabled("feature_pinning");
     const pinCount = usePinnedEvents(pinningEnabled && room)?.length;
 
     return <BaseCard header={header} className="mx_RoomSummaryCard" onClose={onClose}>
@@ -308,18 +302,19 @@ const RoomSummaryCard: React.FC<IProps> = ({ room, onClose }) => {
                     { memberCount }
                 </span>
             </Button>
-            <Button className="mx_RoomSummaryCard_icon_files" onClick={onRoomFilesClick}>
+            { !isVideoRoom && <Button className="mx_RoomSummaryCard_icon_files" onClick={onRoomFilesClick}>
                 { _t("Files") }
-            </Button>
-            { pinningEnabled && <Button className="mx_RoomSummaryCard_icon_pins" onClick={onRoomPinsClick}>
-                { _t("Pinned") }
-                { pinCount > 0 && <span className="mx_BaseCard_Button_sublabel">
-                    { pinCount }
-                </span> }
             </Button> }
-            <Button className="mx_RoomSummaryCard_icon_export" onClick={onRoomExportClick}>
+            { pinningEnabled && !isVideoRoom &&
+                <Button className="mx_RoomSummaryCard_icon_pins" onClick={onRoomPinsClick}>
+                    { _t("Pinned") }
+                    { pinCount > 0 && <span className="mx_BaseCard_Button_sublabel">
+                        { pinCount }
+                    </span> }
+                </Button> }
+            { !isVideoRoom && <Button className="mx_RoomSummaryCard_icon_export" onClick={onRoomExportClick}>
                 { _t("Export chat") }
-            </Button>
+            </Button> }
             <Button className="mx_RoomSummaryCard_icon_share" onClick={onShareRoomClick}>
                 { _t("Share room") }
             </Button>
@@ -330,6 +325,7 @@ const RoomSummaryCard: React.FC<IProps> = ({ room, onClose }) => {
 
         {
             SettingsStore.getValue(UIFeature.Widgets)
+            && !isVideoRoom
             && shouldShowComponent(UIComponent.AddIntegrations)
             && <AppsSection room={room} />
         }

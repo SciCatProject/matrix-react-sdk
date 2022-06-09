@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import './skinned-sdk';
-
 import { IProtocol } from 'matrix-js-sdk/src/matrix';
 import { CallEvent, CallState, CallType } from 'matrix-js-sdk/src/webrtc/call';
 import EventEmitter from 'events';
@@ -23,12 +21,10 @@ import EventEmitter from 'events';
 import CallHandler, {
     CallHandlerEvent, PROTOCOL_PSTN, PROTOCOL_PSTN_PREFIXED, PROTOCOL_SIP_NATIVE, PROTOCOL_SIP_VIRTUAL,
 } from '../src/CallHandler';
-import { stubClient, mkStubRoom } from './test-utils';
+import { stubClient, mkStubRoom, untilDispatch } from './test-utils';
 import { MatrixClientPeg } from '../src/MatrixClientPeg';
-import dis from '../src/dispatcher/dispatcher';
 import DMRoomMap from '../src/utils/DMRoomMap';
 import SdkConfig from '../src/SdkConfig';
-import { ActionPayload } from '../src/dispatcher/payloads';
 import { Action } from "../src/dispatcher/actions";
 
 // The Matrix IDs that the user sees when talking to Alice & Bob
@@ -53,7 +49,7 @@ const VIRTUAL_ROOM_BOB = "$virtual_bob_room:example.org";
 const BOB_PHONE_NUMBER = "01818118181";
 
 function mkStubDM(roomId, userId) {
-    const room = mkStubRoom(roomId);
+    const room = mkStubRoom(roomId, 'room', MatrixClientPeg.get());
     room.getJoinedMembers = jest.fn().mockReturnValue([
         {
             userId: '@me:example.org',
@@ -95,18 +91,6 @@ class FakeCall extends EventEmitter {
     placeVoiceCall() {
         this.emit(CallEvent.State, CallState.Connected, null);
     }
-}
-
-function untilDispatch(waitForAction: string): Promise<ActionPayload> {
-    let dispatchHandle;
-    return new Promise<ActionPayload>(resolve => {
-        dispatchHandle = dis.register(payload => {
-            if (payload.action === waitForAction) {
-                dis.unregister(dispatchHandle);
-                resolve(payload);
-            }
-        });
-    });
 }
 
 function untilCallHandlerEvent(callHandler: CallHandler, event: CallHandlerEvent): Promise<void> {
@@ -312,9 +296,9 @@ describe('CallHandler', () => {
         fakeCall.emit(CallEvent.AssertedIdentityChanged);
 
         // Now set the config option
-        SdkConfig.put({
+        SdkConfig.add({
             voip: {
-                obeyAssertedIdentity: true,
+                obey_asserted_identity: true,
             },
         });
 

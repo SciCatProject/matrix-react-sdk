@@ -21,7 +21,6 @@ import { logger } from "matrix-js-sdk/src/logger";
 import { _t } from '../../../languageHandler';
 import Modal from '../../../Modal';
 import AccessibleButton from "../elements/AccessibleButton";
-import { replaceableComponent } from "../../../utils/replaceableComponent";
 import { mediaFromContent } from "../../../customisations/Media";
 import ErrorDialog from "../dialogs/ErrorDialog";
 import { presentableTextForFile } from "../../../utils/FileUtils";
@@ -106,7 +105,6 @@ interface IState {
     decryptedBlob?: Blob;
 }
 
-@replaceableComponent("views.messages.MFileBody")
 export default class MFileBody extends React.Component<IProps, IState> {
     static contextType = RoomContext;
     public context!: React.ContextType<typeof RoomContext>;
@@ -346,7 +344,7 @@ export default class MFileBody extends React.Component<IProps, IState> {
                         </a>
                         { this.context.timelineRenderingType === TimelineRenderingType.File && (
                             <div className="mx_MImageBody_size">
-                                { this.content.info && this.content.info.size ? filesize(this.content.info.size) : "" }
+                                { this.content.info?.size ? filesize(this.content.info.size) : "" }
                             </div>
                         ) }
                     </div> }

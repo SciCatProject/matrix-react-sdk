@@ -82,12 +82,13 @@ export class RoomNotificationStateStore extends AsyncStoreWithClient<IState> {
      */
     public getRoomState(room: Room): RoomNotificationState {
         if (!this.roomMap.has(room)) {
-            this.roomMap.set(room, new RoomNotificationState(room));
             // Not very elegant, but that way we ensure that we start tracking
             // threads notification at the same time at rooms.
             // There are multiple entry points, and it's unclear which one gets
             // called first
-            this.roomThreadsMap.set(room, new ThreadsRoomNotificationState(room));
+            const threadState = new ThreadsRoomNotificationState(room);
+            this.roomThreadsMap.set(room, threadState);
+            this.roomMap.set(room, new RoomNotificationState(room, threadState));
         }
         return this.roomMap.get(room);
     }
@@ -123,7 +124,8 @@ export class RoomNotificationStateStore extends AsyncStoreWithClient<IState> {
         if (this.globalState.symbol !== globalState.symbol ||
             this.globalState.count !== globalState.count ||
             this.globalState.color !== globalState.color ||
-            this.globalState.numUnreadStates !== globalState.numUnreadStates
+            this.globalState.numUnreadStates !== globalState.numUnreadStates ||
+            state !== prevState
         ) {
             this._globalState = globalState;
             this.emit(UPDATE_STATUS_INDICATOR, globalState, state, prevState, data);

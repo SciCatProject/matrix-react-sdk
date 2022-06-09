@@ -19,7 +19,6 @@ import React from 'react';
 import { COUNTRIES, getEmojiFlag, PhoneNumberCountryDefinition } from '../../../phonenumber';
 import SdkConfig from "../../../SdkConfig";
 import { _t } from "../../../languageHandler";
-import { replaceableComponent } from "../../../utils/replaceableComponent";
 import Dropdown from "../elements/Dropdown";
 
 const COUNTRIES_BY_ISO2 = {};
@@ -53,7 +52,6 @@ interface IState {
     defaultCountry: PhoneNumberCountryDefinition;
 }
 
-@replaceableComponent("views.auth.CountryDropdown")
 export default class CountryDropdown extends React.Component<IProps, IState> {
     constructor(props: IProps) {
         super(props);
@@ -137,7 +135,7 @@ export default class CountryDropdown extends React.Component<IProps, IState> {
         });
 
         // default value here too, otherwise we need to handle null / undefined
-        // values between mounting and the initial value propgating
+        // values between mounting and the initial value propagating
         const value = this.props.value || this.state.defaultCountry.iso2;
 
         return <Dropdown

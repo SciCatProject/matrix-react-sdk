@@ -31,7 +31,6 @@ import SettingsStore from "../../../settings/SettingsStore";
 import { formatFullDate } from "../../../DateUtils";
 import dis from '../../../dispatcher/dispatcher';
 import { Action } from '../../../dispatcher/actions';
-import { replaceableComponent } from "../../../utils/replaceableComponent";
 import { RoomPermalinkCreator } from "../../../utils/permalinks/Permalinks";
 import { normalizeWheelEvent } from "../../../utils/Mouse";
 import { IDialogProps } from '../dialogs/IDialogProps';
@@ -39,6 +38,7 @@ import UIStore from '../../../stores/UIStore';
 import { ViewRoomPayload } from "../../../dispatcher/payloads/ViewRoomPayload";
 import { KeyBindingAction } from "../../../accessibility/KeyboardShortcuts";
 import { getKeyBindingsManager } from "../../../KeyBindingsManager";
+import { presentableTextForFile } from "../../../utils/FileUtils";
 
 // Max scale to keep gaps around the image
 const MAX_SCALE = 0.95;
@@ -90,7 +90,6 @@ interface IState {
     contextMenuDisplayed: boolean;
 }
 
-@replaceableComponent("views.elements.ImageView")
 export default class ImageView extends React.Component<IProps, IState> {
     constructor(props) {
         super(props);
@@ -536,6 +535,15 @@ export default class ImageView extends React.Component<IProps, IState> {
             );
         }
 
+        let title: JSX.Element;
+        if (this.props.mxEvent?.getContent()) {
+            title = (
+                <div className="mx_ImageView_title">
+                    { presentableTextForFile(this.props.mxEvent?.getContent(), _t("Image"), true) }
+                </div>
+            );
+        }
+
         return (
             <FocusLock
                 returnFocus={true}
@@ -548,6 +556,7 @@ export default class ImageView extends React.Component<IProps, IState> {
             >
                 <div className="mx_ImageView_panel">
                     { info }
+                    { title }
                     <div className="mx_ImageView_toolbar">
                         { zoomOutButton }
                         { zoomInButton }

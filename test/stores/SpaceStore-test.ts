@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { EventEmitter } from "events";
 import { mocked } from 'jest-mock';
 import { EventType } from "matrix-js-sdk/src/@types/event";
 import { RoomMember } from "matrix-js-sdk/src/models/room-member";
@@ -21,7 +22,6 @@ import { RoomStateEvent } from "matrix-js-sdk/src/models/room-state";
 import { defer } from "matrix-js-sdk/src/utils";
 import { ClientEvent, RoomEvent, MatrixEvent } from 'matrix-js-sdk/src/matrix';
 
-import "../skinned-sdk"; // Must be first for skinning to work
 import SpaceStore from "../../src/stores/spaces/SpaceStore";
 import {
     MetaSpace,
@@ -1221,5 +1221,27 @@ describe("SpaceStore", () => {
         expect(SpaceStore.instance.invitedSpaces).toStrictEqual([]);
         expect(SpaceStore.instance.spacePanelSpaces.map(r => r.roomId)).toStrictEqual([rootSpace.roomId]);
         await prom;
+    });
+
+    it("correctly emits events for metaspace changes during onReady", async () => {
+        // similar to useEventEmitterState, but for use inside of tests
+        function testEventEmitterState(
+            emitter: EventEmitter | undefined,
+            eventName: string | symbol,
+            callback: (...args: any[]) => void,
+        ): () => void {
+            callback();
+            emitter.addListener(eventName, callback);
+            return () => emitter.removeListener(eventName, callback);
+        }
+
+        let metaSpaces;
+        const removeListener = testEventEmitterState(store, UPDATE_TOP_LEVEL_SPACES, () => {
+            metaSpaces = store.enabledMetaSpaces;
+        });
+        expect(metaSpaces).toEqual(store.enabledMetaSpaces);
+        await run();
+        expect(metaSpaces).toEqual(store.enabledMetaSpaces);
+        removeListener();
     });
 });

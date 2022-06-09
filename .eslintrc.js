@@ -86,12 +86,15 @@ module.exports = {
         "jsx-a11y/no-static-element-interactions": "off",
         "jsx-a11y/role-supports-aria-props": "off",
         "jsx-a11y/tabindex-no-positive": "off",
+
+        "matrix-org/require-copyright-header": "error",
     },
     overrides: [
         {
             files: [
                 "src/**/*.{ts,tsx}",
                 "test/**/*.{ts,tsx}",
+                "cypress/**/*.ts",
             ],
             extends: [
                 "plugin:matrix-org/typescript",
@@ -112,6 +115,8 @@ module.exports = {
                 "@typescript-eslint/no-explicit-any": "off",
                 // We'd rather not do this but we do
                 "@typescript-eslint/ban-ts-comment": "off",
+                // We're okay with assertion errors when we ask for them
+                "@typescript-eslint/no-non-null-assertion": "off",
             },
         },
         // temporary override for offending icon require files
@@ -123,7 +128,6 @@ module.exports = {
                 "src/components/structures/UserMenu.tsx",
                 "src/components/views/avatars/WidgetAvatar.tsx",
                 "src/components/views/dialogs/AddExistingToSpaceDialog.tsx",
-                "src/components/views/dialogs/CreateSpaceFromCommunityDialog.tsx",
                 "src/components/views/dialogs/ForwardDialog.tsx",
                 "src/components/views/dialogs/InviteDialog.tsx",
                 "src/components/views/dialogs/ModalWidgetDialog.tsx",

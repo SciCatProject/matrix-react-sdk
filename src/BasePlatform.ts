@@ -70,7 +70,7 @@ export default abstract class BasePlatform {
     protected onAction = (payload: ActionPayload) => {
         switch (payload.action) {
             case 'on_client_not_viable':
-            case 'on_logged_out':
+            case Action.OnLoggedOut:
                 this.setNotificationCount(0);
                 break;
         }
@@ -142,6 +142,13 @@ export default abstract class BasePlatform {
      * spell-checking, otherwise false.
      */
     supportsMultiLanguageSpellCheck(): boolean {
+        return false;
+    }
+
+    /**
+     * Returns true if platform allows overriding native context menus
+     */
+    public allowOverridingNativeContextMenus(): boolean {
         return false;
     }
 
@@ -230,7 +237,7 @@ export default abstract class BasePlatform {
     }
 
     /**
-     * Restarts the application, without neccessarily reloading
+     * Restarts the application, without necessarily reloading
      * any application code
      */
     abstract reload();
@@ -281,6 +288,18 @@ export default abstract class BasePlatform {
     }
 
     async setMinimizeToTrayEnabled(enabled: boolean): Promise<void> {
+        throw new Error("Unimplemented");
+    }
+
+    public supportsTogglingHardwareAcceleration(): boolean {
+        return false;
+    }
+
+    public async getHardwareAccelerationEnabled(): Promise<boolean> {
+        return true;
+    }
+
+    public async setHardwareAccelerationEnabled(enabled: boolean): Promise<void> {
         throw new Error("Unimplemented");
     }
 

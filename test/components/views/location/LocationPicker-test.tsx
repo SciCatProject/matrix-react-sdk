@@ -23,16 +23,14 @@ import { MatrixClient } from 'matrix-js-sdk/src/client';
 import { mocked } from 'jest-mock';
 import { logger } from 'matrix-js-sdk/src/logger';
 
-import "../../../skinned-sdk"; // Must be first for skinning to work
-import LocationPicker, { getGeoUri } from "../../../../src/components/views/location/LocationPicker";
+import LocationPicker from "../../../../src/components/views/location/LocationPicker";
 import { LocationShareType } from "../../../../src/components/views/location/shareLocation";
 import MatrixClientContext from '../../../../src/contexts/MatrixClientContext';
 import { MatrixClientPeg } from '../../../../src/MatrixClientPeg';
 import { findById, findByTestId, mockPlatformPeg } from '../../../test-utils';
-import { findMapStyleUrl } from '../../../../src/components/views/location/findMapStyleUrl';
-import { LocationShareError } from '../../../../src/components/views/location/LocationShareErrors';
+import { findMapStyleUrl, LocationShareError } from '../../../../src/utils/location';
 
-jest.mock('../../../../src/components/views/location/findMapStyleUrl', () => ({
+jest.mock('../../../../src/utils/location/findMapStyleUrl', () => ({
     findMapStyleUrl: jest.fn().mockReturnValue('tileserver.com'),
 }));
 
@@ -40,65 +38,6 @@ jest.mock('../../../../src/components/views/location/findMapStyleUrl', () => ({
 mockPlatformPeg({ overrideBrowserShortcuts: jest.fn().mockReturnValue(false) });
 
 describe("LocationPicker", () => {
-    describe("getGeoUri", () => {
-        it("Renders a URI with only lat and lon", () => {
-            const pos = {
-                latitude: 43.2,
-                longitude: 12.4,
-                altitude: undefined,
-                accuracy: undefined,
-
-                timestamp: 12334,
-            };
-            expect(getGeoUri(pos)).toEqual("geo:43.2,12.4");
-        });
-
-        it("Nulls in location are not shown in URI", () => {
-            const pos = {
-                latitude: 43.2,
-                longitude: 12.4,
-                altitude: null,
-                accuracy: null,
-
-                timestamp: 12334,
-            };
-            expect(getGeoUri(pos)).toEqual("geo:43.2,12.4");
-        });
-
-        it("Renders a URI with 3 coords", () => {
-            const pos = {
-                latitude: 43.2,
-                longitude: 12.4,
-                altitude: 332.54,
-                accuracy: undefined,
-                timestamp: 12334,
-            };
-            expect(getGeoUri(pos)).toEqual("geo:43.2,12.4,332.54");
-        });
-
-        it("Renders a URI with accuracy", () => {
-            const pos = {
-                latitude: 43.2,
-                longitude: 12.4,
-                altitude: undefined,
-                accuracy: 21,
-                timestamp: 12334,
-            };
-            expect(getGeoUri(pos)).toEqual("geo:43.2,12.4;u=21");
-        });
-
-        it("Renders a URI with accuracy and altitude", () => {
-            const pos = {
-                latitude: 43.2,
-                longitude: 12.4,
-                altitude: 12.3,
-                accuracy: 21,
-                timestamp: 12334,
-            };
-            expect(getGeoUri(pos)).toEqual("geo:43.2,12.4,12.3;u=21");
-        });
-    });
-
     describe('<LocationPicker />', () => {
         const roomId = '!room:server.org';
         const userId = '@user:server.org';
@@ -247,6 +186,28 @@ describe("LocationPicker", () => {
                     expect(wrapper.find('MemberAvatar').length).toBeTruthy();
                 });
 
+                it('disables submit button until geolocation completes', () => {
+                    const onChoose = jest.fn();
+                    const wrapper = getComponent({ shareType, onChoose });
+
+                    // submit button is enabled when position is truthy
+                    expect(findByTestId(wrapper, 'location-picker-submit-button').at(0).props().disabled).toBeTruthy();
+                    act(() => {
+                        findByTestId(wrapper, 'location-picker-submit-button').at(0).simulate('click');
+                    });
+                    // nothing happens on button click
+                    expect(onChoose).not.toHaveBeenCalled();
+
+                    act(() => {
+                        // @ts-ignore
+                        mocked(mockGeolocate).emit('geolocate', mockGeolocationPosition);
+                        wrapper.setProps({});
+                    });
+
+                    // submit button is enabled when position is truthy
+                    expect(findByTestId(wrapper, 'location-picker-submit-button').at(0).props().disabled).toBeFalsy();
+                });
+
                 it('submits location', () => {
                     const onChoose = jest.fn();
                     const wrapper = getComponent({ onChoose, shareType });
@@ -344,7 +305,7 @@ describe("LocationPicker", () => {
                 });
 
                 // marker not added
-                expect(wrapper.find('.mx_MLocationBody_markerBorder').length).toBeFalsy();
+                expect(wrapper.find('Marker').length).toBeFalsy();
             });
 
             it('sets position on click event', () => {
@@ -362,7 +323,7 @@ describe("LocationPicker", () => {
                 ));
 
                 // marker is set, icon not avatar
-                expect(wrapper.find('.mx_MLocationBody_markerIcon').length).toBeTruthy();
+                expect(wrapper.find('.mx_Marker_icon').length).toBeTruthy();
             });
 
             it('submits location', () => {
