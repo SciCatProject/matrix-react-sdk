@@ -18,42 +18,53 @@ import { useCallback, useState } from "react";
 
 import { MatrixClientPeg } from "../MatrixClientPeg";
 import { DirectoryMember } from "../utils/direct-messages";
+import { useLatestResult } from "./useLatestResult";
 
 export interface IUserDirectoryOpts {
     limit: number;
-    query?: string;
+    query: string;
 }
 
-export const useUserDirectory = () => {
+export const useUserDirectory = (): {
+    ready: boolean;
+    loading: boolean;
+    users: DirectoryMember[];
+    search(opts: IUserDirectoryOpts): Promise<boolean>;
+} => {
     const [users, setUsers] = useState<DirectoryMember[]>([]);
 
     const [loading, setLoading] = useState(false);
 
-    const search = useCallback(async ({
-        limit = 20,
-        query: term,
-    }: IUserDirectoryOpts): Promise<boolean> => {
-        if (!term?.length) {
-            setUsers([]);
-            return true;
-        }
+    const [updateQuery, updateResult] = useLatestResult<{ term: string; limit?: number }, DirectoryMember[]>(setUsers);
 
-        try {
-            setLoading(true);
-            const { results } = await MatrixClientPeg.get().searchUserDirectory({
-                limit,
-                term,
-            });
-            setUsers(results.map(user => new DirectoryMember(user)));
-            return true;
-        } catch (e) {
-            console.error("Could not fetch user in user directory for params", { limit, term }, e);
-            setUsers([]);
-            return false;
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+    const search = useCallback(
+        async ({ limit = 20, query: term }: IUserDirectoryOpts): Promise<boolean> => {
+            const opts = { limit, term };
+            updateQuery(opts);
+
+            if (!term?.length) {
+                setUsers([]);
+                return true;
+            }
+
+            try {
+                setLoading(true);
+                const { results } = await MatrixClientPeg.get().searchUserDirectory(opts);
+                updateResult(
+                    opts,
+                    results.map((user) => new DirectoryMember(user)),
+                );
+                return true;
+            } catch (e) {
+                console.error("Could not fetch user in user directory for params", { limit, term }, e);
+                updateResult(opts, []);
+                return false;
+            } finally {
+                setLoading(false);
+            }
+        },
+        [updateQuery, updateResult],
+    );
 
     return {
         ready: true,

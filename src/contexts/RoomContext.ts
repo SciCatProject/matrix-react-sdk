@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 
 import { IRoomState } from "../components/structures/RoomView";
 import { Layout } from "../settings/enums/Layout";
@@ -43,6 +43,7 @@ const RoomContext = createContext<IRoomState>({
     showTopUnreadMessagesBar: false,
     statusBarVisible: false,
     canReact: false,
+    canSelfRedact: false,
     canSendMessages: false,
     resizing: false,
     layout: Layout.Group,
@@ -63,6 +64,11 @@ const RoomContext = createContext<IRoomState>({
     threadId: undefined,
     liveTimeline: undefined,
     narrow: false,
+    activeCall: null,
+    msc3946ProcessDynamicPredecessor: false,
 });
 RoomContext.displayName = "RoomContext";
 export default RoomContext;
+export function useRoomContext(): IRoomState {
+    return useContext(RoomContext);
+}
