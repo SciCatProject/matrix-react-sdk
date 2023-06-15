@@ -20,7 +20,7 @@ import classNames from "classnames";
 import { _t } from "../../../languageHandler";
 import SdkConfig from "../../../SdkConfig";
 import { ValidatedServerConfig } from "../../../utils/ValidatedServerConfig";
-import { ButtonEvent } from "../elements/AccessibleButton";
+// import AccessibleButton, { ButtonEvent } from "../elements/AccessibleButton";
 import withValidation, { IFieldState, IValidationResult } from "../elements/Validation";
 import Field from "../elements/Field";
 import CountryDropdown from "./CountryDropdown";
@@ -90,11 +90,11 @@ export default class PasswordLogin extends React.PureComponent<IProps, IState> {
         };
     }
 
-    private onForgotPasswordClick = (ev: ButtonEvent): void => {
-        ev.preventDefault();
-        ev.stopPropagation();
-        this.props.onForgotPasswordClick?.();
-    };
+    // private onForgotPasswordClick = (ev: ButtonEvent): void => {
+    //     ev.preventDefault();
+    //     ev.stopPropagation();
+    //     this.props.onForgotPasswordClick?.();
+    // };
 
     private onSubmitForm = async (ev: SyntheticEvent): Promise<void> => {
         ev.preventDefault();
