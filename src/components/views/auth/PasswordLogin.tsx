@@ -20,7 +20,7 @@ import classNames from "classnames";
 import { _t } from "../../../languageHandler";
 import SdkConfig from "../../../SdkConfig";
 import { ValidatedServerConfig } from "../../../utils/ValidatedServerConfig";
-import AccessibleButton, { ButtonEvent } from "../elements/AccessibleButton";
+import { ButtonEvent } from "../elements/AccessibleButton";
 import withValidation, { IFieldState, IValidationResult } from "../elements/Validation";
 import Field from "../elements/Field";
 import CountryDropdown from "./CountryDropdown";
