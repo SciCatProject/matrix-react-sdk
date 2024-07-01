@@ -16,9 +16,8 @@ limitations under the License.
 
 import { fireEvent, getByLabelText, render, screen } from "@testing-library/react";
 import { mocked } from "jest-mock";
-import { ReceiptType } from "matrix-js-sdk/src/@types/read_receipts";
-import { MatrixClient, PendingEventOrdering } from "matrix-js-sdk/src/client";
-import { Room } from "matrix-js-sdk/src/models/room";
+import { ReceiptType, MatrixClient, PendingEventOrdering, Room } from "matrix-js-sdk/src/matrix";
+import { KnownMembership } from "matrix-js-sdk/src/types";
 import React from "react";
 import userEvent from "@testing-library/user-event";
 
@@ -71,7 +70,7 @@ describe("RoomGeneralContextMenu", () => {
         jest.clearAllMocks();
 
         stubClient();
-        mockClient = mocked(MatrixClientPeg.get());
+        mockClient = mocked(MatrixClientPeg.safeGet());
 
         room = new Room(ROOM_ID, mockClient, mockClient.getUserId() ?? "", {
             pendingEventOrdering: PendingEventOrdering.Detached,
@@ -107,7 +106,7 @@ describe("RoomGeneralContextMenu", () => {
     });
 
     it("does not render invite menu item when UIComponent customisations disable room invite", () => {
-        room.updateMyMembership("join");
+        room.updateMyMembership(KnownMembership.Join);
         jest.spyOn(room, "canInvite").mockReturnValue(true);
         mocked(shouldShowComponent).mockReturnValue(false);
 
@@ -118,7 +117,7 @@ describe("RoomGeneralContextMenu", () => {
     });
 
     it("renders invite menu item when UIComponent customisations enables room invite", () => {
-        room.updateMyMembership("join");
+        room.updateMyMembership(KnownMembership.Join);
         jest.spyOn(room, "canInvite").mockReturnValue(true);
         mocked(shouldShowComponent).mockReturnValue(true);
 
@@ -142,7 +141,25 @@ describe("RoomGeneralContextMenu", () => {
         const markAsReadBtn = getByLabelText(container, "Mark as read");
         fireEvent.click(markAsReadBtn);
 
+        await new Promise(setImmediate);
+
         expect(mockClient.sendReadReceipt).toHaveBeenCalledWith(event, ReceiptType.Read, true);
+        expect(onFinished).toHaveBeenCalled();
+    });
+
+    it("marks the room as unread", async () => {
+        room.updateMyMembership("join");
+
+        const { container } = getComponent({});
+
+        const markAsUnreadBtn = getByLabelText(container, "Mark as unread");
+        fireEvent.click(markAsUnreadBtn);
+
+        await new Promise(setImmediate);
+
+        expect(mockClient.setRoomAccountData).toHaveBeenCalledWith(ROOM_ID, "com.famedly.marked_unread", {
+            unread: true,
+        });
         expect(onFinished).toHaveBeenCalled();
     });
 

@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Room } from "matrix-js-sdk/src/models/room";
+import { JoinRule, Room } from "matrix-js-sdk/src/matrix";
+import { KnownMembership } from "matrix-js-sdk/src/types";
 import { isNullOrUndefined } from "matrix-js-sdk/src/utils";
 import { EventEmitter } from "events";
 import { logger } from "matrix-js-sdk/src/logger";
@@ -30,7 +31,12 @@ import {
     ListAlgorithm,
     SortAlgorithm,
 } from "./models";
-import { EffectiveMembership, getEffectiveMembership, splitRoomsByMembership } from "../../../utils/membership";
+import {
+    EffectiveMembership,
+    getEffectiveMembership,
+    getEffectiveMembershipTag,
+    splitRoomsByMembership,
+} from "../../../utils/membership";
 import { OrderingAlgorithm } from "./list-ordering/OrderingAlgorithm";
 import { getListAlgorithmInstance } from "./list-ordering";
 import { VisibilityProvider } from "../filters/VisibilityProvider";
@@ -88,10 +94,6 @@ export class Algorithm extends EventEmitter {
 
     public get stickyRoom(): Room | null {
         return this._stickyRoom ? this._stickyRoom.room : null;
-    }
-
-    public get knownRooms(): Room[] {
-        return this.rooms;
     }
 
     public get hasTagSortingMap(): boolean {
@@ -171,7 +173,7 @@ export class Algorithm extends EventEmitter {
     }
 
     private doUpdateStickyRoom(val: Room | null): void {
-        if (val?.isSpaceRoom() && val.getMyMembership() !== "invite") {
+        if (val?.isSpaceRoom() && val.getMyMembership() !== KnownMembership.Invite) {
             // no-op sticky rooms for spaces - they're effectively virtual rooms
             val = null;
         }
@@ -497,6 +499,8 @@ export class Algorithm extends EventEmitter {
             newTags[DefaultTagID.Invite].push(room);
         }
         for (const room of memberships[EffectiveMembership.Leave]) {
+            // We may not have had an archived section previously, so make sure its there.
+            if (newTags[DefaultTagID.Archived] === undefined) newTags[DefaultTagID.Archived] = [];
             newTags[DefaultTagID.Archived].push(room);
         }
 
@@ -547,7 +551,10 @@ export class Algorithm extends EventEmitter {
     public getTagsForRoom(room: Room): TagID[] {
         const tags: TagID[] = [];
 
-        const membership = getEffectiveMembership(room.getMyMembership());
+        if (!getEffectiveMembership(room.getMyMembership())) return []; // peeked room has no tags
+
+        const membership = getEffectiveMembershipTag(room);
+
         if (membership === EffectiveMembership.Invite) {
             tags.push(DefaultTagID.Invite);
         } else if (membership === EffectiveMembership.Leave) {
@@ -569,6 +576,9 @@ export class Algorithm extends EventEmitter {
             if (DMRoomMap.shared().getUserIdForRoomId(room.roomId)) {
                 tags = [DefaultTagID.DM];
             }
+        }
+        if (room.isCallRoom() && (room.getJoinRule() === JoinRule.Public || room.getJoinRule() === JoinRule.Knock)) {
+            tags.push(DefaultTagID.Conference);
         }
 
         return tags;

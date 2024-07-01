@@ -16,8 +16,16 @@ limitations under the License.
 
 import React from "react";
 import { act, render, fireEvent } from "@testing-library/react";
-import { EventType, EventStatus, MatrixEvent, MatrixEventEvent, MsgType, Room } from "matrix-js-sdk/src/matrix";
-import { FeatureSupport, Thread } from "matrix-js-sdk/src/models/thread";
+import {
+    EventType,
+    EventStatus,
+    MatrixEvent,
+    MatrixEventEvent,
+    MsgType,
+    Room,
+    FeatureSupport,
+    Thread,
+} from "matrix-js-sdk/src/matrix";
 
 import MessageActionBar from "../../../../src/components/views/messages/MessageActionBar";
 import {
@@ -38,6 +46,14 @@ jest.mock("../../../../src/dispatcher/dispatcher");
 describe("<MessageActionBar />", () => {
     const userId = "@alice:server.org";
     const roomId = "!room:server.org";
+
+    const client = getMockClientWithEventEmitter({
+        ...mockClientMethodsUser(userId),
+        ...mockClientMethodsEvents(),
+        getRoom: jest.fn(),
+    });
+    const room = new Room(roomId, client, userId);
+
     const alicesMessageEvent = new MatrixEvent({
         type: EventType.RoomMessage,
         sender: userId,
@@ -64,13 +80,7 @@ describe("<MessageActionBar />", () => {
         type: EventType.RoomMessage,
         sender: userId,
     });
-    redactedEvent.makeRedacted(redactedEvent);
-
-    const client = getMockClientWithEventEmitter({
-        ...mockClientMethodsUser(userId),
-        ...mockClientMethodsEvents(),
-        getRoom: jest.fn(),
-    });
+    redactedEvent.makeRedacted(redactedEvent, room);
 
     const localStorageMock = (() => {
         let store: Record<string, any> = {};
@@ -90,7 +100,6 @@ describe("<MessageActionBar />", () => {
         writable: true,
     });
 
-    const room = new Room(roomId, client, userId);
     jest.spyOn(room, "getPendingEvents").mockReturnValue([]);
 
     client.getRoom.mockReturnValue(room);
@@ -433,88 +442,7 @@ describe("<MessageActionBar />", () => {
         });
     });
 
-    describe("favourite button", () => {
-        //for multiple event usecase
-        const favButton = (evt: MatrixEvent) => {
-            return getComponent({ mxEvent: evt }).getByTestId(evt.getId()!);
-        };
-
-        describe("when favourite_messages feature is enabled", () => {
-            beforeEach(() => {
-                jest.spyOn(SettingsStore, "getValue").mockImplementation(
-                    (setting) => setting === "feature_favourite_messages",
-                );
-                localStorageMock.clear();
-            });
-
-            it("renders favourite button on own actionable event", () => {
-                const { queryByLabelText } = getComponent({ mxEvent: alicesMessageEvent });
-                expect(queryByLabelText("Favourite")).toBeTruthy();
-            });
-
-            it("renders favourite button on other actionable events", () => {
-                const { queryByLabelText } = getComponent({ mxEvent: bobsMessageEvent });
-                expect(queryByLabelText("Favourite")).toBeTruthy();
-            });
-
-            it("does not render Favourite button on non-actionable event", () => {
-                //redacted event is not actionable
-                const { queryByLabelText } = getComponent({ mxEvent: redactedEvent });
-                expect(queryByLabelText("Favourite")).toBeFalsy();
-            });
-
-            it("remembers favourited state of multiple events, and handles the localStorage of the events accordingly", () => {
-                const alicesAction = favButton(alicesMessageEvent);
-                const bobsAction = favButton(bobsMessageEvent);
-
-                //default state before being clicked
-                expect(alicesAction.classList).not.toContain("mx_MessageActionBar_favouriteButton_fillstar");
-                expect(bobsAction.classList).not.toContain("mx_MessageActionBar_favouriteButton_fillstar");
-                expect(localStorageMock.getItem("io_element_favouriteMessages")).toBeNull();
-
-                //if only alice's event is fired
-                fireEvent.click(alicesAction);
-
-                expect(alicesAction.classList).toContain("mx_MessageActionBar_favouriteButton_fillstar");
-                expect(bobsAction.classList).not.toContain("mx_MessageActionBar_favouriteButton_fillstar");
-                expect(localStorageMock.setItem).toHaveBeenCalledWith(
-                    "io_element_favouriteMessages",
-                    '["$alices_message"]',
-                );
-
-                //when bob's event is fired,both should be styled and stored in localStorage
-                fireEvent.click(bobsAction);
-
-                expect(alicesAction.classList).toContain("mx_MessageActionBar_favouriteButton_fillstar");
-                expect(bobsAction.classList).toContain("mx_MessageActionBar_favouriteButton_fillstar");
-                expect(localStorageMock.setItem).toHaveBeenCalledWith(
-                    "io_element_favouriteMessages",
-                    '["$alices_message","$bobs_message"]',
-                );
-
-                //finally, at this point the localStorage should contain the two eventids
-                expect(localStorageMock.getItem("io_element_favouriteMessages")).toEqual(
-                    '["$alices_message","$bobs_message"]',
-                );
-
-                //if decided to unfavourite bob's event by clicking again
-                fireEvent.click(bobsAction);
-                expect(bobsAction.classList).not.toContain("mx_MessageActionBar_favouriteButton_fillstar");
-                expect(alicesAction.classList).toContain("mx_MessageActionBar_favouriteButton_fillstar");
-                expect(localStorageMock.getItem("io_element_favouriteMessages")).toEqual('["$alices_message"]');
-            });
-        });
-
-        describe("when favourite_messages feature is disabled", () => {
-            it("does not render", () => {
-                jest.spyOn(SettingsStore, "getValue").mockReturnValue(false);
-                const { queryByLabelText } = getComponent({ mxEvent: alicesMessageEvent });
-                expect(queryByLabelText("Favourite")).toBeFalsy();
-            });
-        });
-    });
-
-    it.each([["React"], ["Reply"], ["Reply in thread"], ["Favourite"], ["Edit"]])(
+    it.each([["React"], ["Reply"], ["Reply in thread"], ["Edit"]])(
         "does not show context menu when right-clicking",
         (buttonLabel: string) => {
             // For favourite button
