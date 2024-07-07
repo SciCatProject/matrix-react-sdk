@@ -162,6 +162,7 @@ const UserProfileSettings: React.FC = () => {
                     disableSaveButton={displayName === initialDisplayName}
                     saveButtonLabel={_t("common|save")}
                     cancelButtonLabel={_t("common|cancel")}
+                    savingLabel={_t("common|saving")}
                     savedLabel={_t("common|saved")}
                     onChange={onDisplayNameChanged}
                     onCancel={onDisplayNameCancel}

@@ -310,7 +310,6 @@
             "sign_out_other_devices": "Sign out of all devices"
         },
         "reset_password_action": "Reset password",
-        "reset_password_button": "Forgot password?",
         "reset_password_email_field_description": "Use an email address to recover your account",
         "reset_password_email_field_required_invalid": "Enter email address (required on this homeserver)",
         "reset_password_email_not_associated": "Your email address does not appear to be associated with a Matrix ID on this homeserver.",
@@ -1327,6 +1326,7 @@
         "one": "<Items/> and one other",
         "other": "<Items/> and %(count)s others"
     },
+    "joined_lots_of_room_warning": "If you joined lots of rooms, this might take a while",
     "keyboard": {
         "activate_button": "Activate selected button",
         "alt": "Alt",

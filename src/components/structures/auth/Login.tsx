@@ -530,7 +530,7 @@ export default class LoginComponent extends React.PureComponent<IProps, IState> 
             {
                 this.props.isSyncing && (
                     <div className="mx_AuthBody_paddedFooter_subtitle">
-                        {_t("If you've joined lots of rooms, this might take a while")}
+                        {_t("joined_lots_of_room_warning")}
                     </div>
                 );
             }
